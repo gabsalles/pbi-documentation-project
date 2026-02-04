@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Bradesco PBIP Documentation</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            colors: {
+              brand: {
+                primary: '#CC092F', // Bradesco Red
+                secondary: '#B50829',
+                dark: '#212121',
+                gray: '#F4F4F4',
+                light: '#FFFFFF'
+              }
+            },
+            fontFamily: {
+              sans: ['"Bradesco Sans"', 'Segoe UI', 'Roboto', 'Helvetica', 'Arial', 'sans-serif'],
+            }
+          }
+        }
+      }
+    </script>
+    <style>
+      @font-face {
+        font-family: 'Bradesco Sans';
+        src: local('Segoe UI'); /* Fallback for demo environment */
+        font-weight: 400;
+      }
+      @media print {
+        .no-print { display: none !important; }
+        .print-break-before { page-break-before: always; }
+        body, html { 
+            background-color: white; 
+            height: auto !important; 
+            overflow: visible !important; 
+        }
+        #root { height: auto !important; }
+        .shadow-md { box-shadow: none !important; border: 1px solid #ddd; }
+        /* Ensure all content is visible */
+        main { overflow: visible !important; }
+      }
+      /* Custom scrollbar */
+      ::-webkit-scrollbar {
+        width: 8px;
+        height: 8px;
+      }
+      ::-webkit-scrollbar-track {
+        background: #f1f1f1; 
+      }
+      ::-webkit-scrollbar-thumb {
+        background: #ccc; 
+        border-radius: 4px;
+      }
+      ::-webkit-scrollbar-thumb:hover {
+        background: #CC092F; 
+      }
+    </style>
+  <script type="importmap">
+{
+  "imports": {
+    "lucide-react": "https://esm.sh/lucide-react@^0.563.0",
+    "react/": "https://esm.sh/react@^19.2.4/",
+    "react": "https://esm.sh/react@^19.2.4",
+    "recharts": "https://esm.sh/recharts@^3.7.0",
+    "react-dom/": "https://esm.sh/react-dom@^19.2.4/"
+  }
+}
+</script>
+<link rel="stylesheet" href="/index.css">
+</head>
+  <body class="bg-brand-gray text-brand-dark h-screen overflow-hidden">
+    <div id="root" class="h-full"></div>
+  <script type="module" src="/index.tsx"></script>
+</body>
+</html>

@@ -1,0 +1,5 @@
+{
+  "name": "Bradesco PBIP DocGen",
+  "description": "Ferramenta de documentação automatizada para Power BI Project (PBIP) com análise de dependências e visualização de arquitetura.",
+  "requestFramePermissions": []
+}
