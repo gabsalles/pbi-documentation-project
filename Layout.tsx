@@ -1,6 +1,6 @@
 import React from 'react';
 import { FileText, Database, Calculator, GitMerge, LayoutDashboard, Printer, Download, Shield } from 'lucide-react';
-import { generateStaticHtml } from '../utils/htmlGenerator';
+import { generateStaticHtml } from "@/utils/htmlGenerator";
 import { PBIModel } from '../types';
 
 interface LayoutProps {
