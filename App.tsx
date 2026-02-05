@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { PBIModel } from './types';
+import { PBIModel, PBIPage } from './types';
 import { parsePBIPData } from './services/pbipParser';
 import Layout from './Layout';
 import FileUpload from './components/FileUpload';
@@ -30,6 +30,15 @@ const App: React.FC = () => {
     }
   };
 
+  const handlePageUpdate = (index: number, updatedPage: PBIPage) => {
+    setModel((prevModel) => {
+      if (!prevModel) return null;
+      const newPages = [...prevModel.pages];
+      newPages[index] = updatedPage;
+      return { ...prevModel, pages: newPages };
+    });
+  };
+
   if (!model) {
     return <FileUpload onUpload={handleUpload} loading={loading} />;
   }
@@ -41,7 +50,7 @@ const App: React.FC = () => {
       case 'measures': return <MeasuresView model={model} />;
       case 'relationships': return <RelationshipsView model={model} />;
       case 'security': return <SecurityView model={model} />;
-      case 'report': return <ReportView model={model} />;
+      case 'report': return <ReportView model={model} onUpdatePage={handlePageUpdate} />;
       default: return <Dashboard model={model} />;
     }
   };
@@ -55,7 +64,7 @@ const App: React.FC = () => {
          <div className="break-before-page"><MeasuresView model={model} /></div>
          <div className="break-before-page"><RelationshipsView model={model} /></div>
          <div className="break-before-page"><SecurityView model={model} /></div>
-         <div className="break-before-page"><ReportView model={model} /></div>
+         <div className="break-before-page"><ReportView model={model} onUpdatePage={() => {}} /></div>
       </div>
       
       {/* Screen View */}

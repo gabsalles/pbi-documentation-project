@@ -75,6 +75,7 @@ export interface PBIPage {
   displayName: string;
   visuals: PBIVisual[];
   hiddenFilters?: string[];
+  screenshot?: string; // Base64 image string
 }
 
 export interface PBIRole {

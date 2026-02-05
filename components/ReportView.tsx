@@ -1,12 +1,62 @@
-import React from 'react';
-import { PBIModel } from '../types';
-import { Layout, BarChart2, Filter, MousePointerClick, Bookmark, EyeOff, ExternalLink, ArrowRightCircle, ArrowLeft, XCircle, CheckCircle, Calculator, Database } from 'lucide-react';
+import React, { useState } from 'react';
+import { PBIModel, PBIPage } from '../types';
+import { Layout, BarChart2, Filter, MousePointerClick, Bookmark, EyeOff, ExternalLink, ArrowRightCircle, ArrowLeft, XCircle, CheckCircle, Calculator, Database, ImagePlus, Trash2, Loader2 } from 'lucide-react';
 
 interface ReportViewProps {
   model: PBIModel;
+  onUpdatePage: (index: number, page: PBIPage) => void;
 }
 
-const ReportView: React.FC<ReportViewProps> = ({ model }) => {
+const ReportView: React.FC<ReportViewProps> = ({ model, onUpdatePage }) => {
+  const [processingIdx, setProcessingIdx] = useState<number | null>(null);
+
+  const handleImageUpload = (index: number, e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      processFile(index, file);
+    }
+    // Reset input value to allow selecting the same file again if needed
+    e.target.value = '';
+  };
+
+  const processFile = (index: number, file: File) => {
+      setProcessingIdx(index);
+      const reader = new FileReader();
+      
+      reader.onload = () => {
+          const base64 = reader.result as string;
+          // Create updated page object
+          const updatedPage = { ...model.pages[index], screenshot: base64 };
+          onUpdatePage(index, updatedPage);
+          setProcessingIdx(null);
+      };
+      
+      reader.onerror = (error) => {
+          console.error("Erro ao ler o arquivo:", error);
+          alert("Erro ao carregar a imagem. Tente novamente.");
+          setProcessingIdx(null);
+      };
+
+      // Read as Data URL (Base64)
+      reader.readAsDataURL(file);
+  };
+
+  const handleDrop = (index: number, e: React.DragEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+          const file = e.dataTransfer.files[0];
+          if (file.type.startsWith('image/')) {
+              processFile(index, file);
+          }
+      }
+  };
+
+  const removeImage = (index: number) => {
+      const updatedPage = { ...model.pages[index], screenshot: undefined };
+      onUpdatePage(index, updatedPage);
+  };
+
   return (
     <div className="p-6 space-y-6">
       <div className="flex justify-between items-center">
@@ -55,6 +105,54 @@ const ReportView: React.FC<ReportViewProps> = ({ model }) => {
                     )}
                  </div>
                  
+                 {/* SCREENSHOT SECTION */}
+                 <div className="border-b border-gray-100 bg-gray-50/50">
+                    {page.screenshot ? (
+                        <div className="relative group bg-gray-100 flex justify-center py-4">
+                            <img 
+                                src={page.screenshot} 
+                                alt={`Screenshot ${page.displayName}`} 
+                                className="max-h-[400px] max-w-full object-contain shadow-sm border border-gray-200"
+                            />
+                            <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <button 
+                                    onClick={() => removeImage(idx)}
+                                    className="bg-red-500 text-white p-2 rounded-lg shadow-lg hover:bg-red-600 transition-colors"
+                                    title="Remover Imagem"
+                                >
+                                    <Trash2 size={16} />
+                                </button>
+                            </div>
+                        </div>
+                    ) : (
+                        <label 
+                            className={`p-6 border-2 border-dashed border-gray-300 rounded-lg m-4 flex flex-col items-center justify-center text-gray-400 hover:bg-gray-50 hover:border-brand-primary/50 hover:text-brand-primary transition-all cursor-pointer group no-print bg-white relative ${processingIdx === idx ? 'opacity-50 pointer-events-none' : ''}`}
+                            onDragOver={(e) => e.preventDefault()}
+                            onDrop={(e) => handleDrop(idx, e)}
+                        >
+                            {processingIdx === idx ? (
+                                <div className="flex flex-col items-center">
+                                    <Loader2 size={32} className="mb-2 animate-spin text-brand-primary" />
+                                    <p className="text-sm font-medium">Processando imagem...</p>
+                                </div>
+                            ) : (
+                                <>
+                                    <ImagePlus size={32} className="mb-2 group-hover:scale-110 transition-transform" />
+                                    <p className="text-sm font-medium">Clique ou arraste um print da tela aqui</p>
+                                    <p className="text-xs opacity-70 mt-1">Isso será incluído na documentação HTML</p>
+                                </>
+                            )}
+                            <input 
+                                type="file" 
+                                accept="image/*" 
+                                className="hidden" 
+                                onChange={(e) => handleImageUpload(idx, e)}
+                                disabled={processingIdx === idx}
+                            />
+                        </label>
+                    )}
+                 </div>
+
                  <div className="p-5">
                     {/* Page Level Hidden Filters */}
                     {page.hiddenFilters && page.hiddenFilters.length > 0 && (

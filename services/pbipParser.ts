@@ -70,6 +70,7 @@ export const parsePBIPData = async (files: FileList): Promise<PBIModel> => {
   let expressionsFile: File | undefined;
   let reportJsonFile: File | undefined;
   let modelTmdlFile: File | undefined;
+  let modelBimFile: File | undefined; // Support for legacy/JSON models
   
   const pageFiles = new Map<string, File>(); 
   const visualFiles = new Map<string, File[]>(); 
@@ -84,10 +85,16 @@ export const parsePBIPData = async (files: FileList): Promise<PBIModel> => {
         else if (fileName === 'model.tmdl') modelTmdlFile = f; 
         else if (fileName === 'database.tmdl' || fileName.includes('culture')) { /* ignore */ }
         else {
+            // Initial filename check, but we do strict check in content parser too
             if (!fileName.startsWith('LocalDateTable_') && !fileName.startsWith('DateTableTemplate_')) {
                 tableFiles.push(f);
             }
         }
+    }
+    
+    // Catch model.bim
+    if (fileName === 'model.bim' || fileName.endsWith('.bim')) {
+        modelBimFile = f;
     }
 
     if (fileName === 'report.json') {
@@ -112,41 +119,56 @@ export const parsePBIPData = async (files: FileList): Promise<PBIModel> => {
     }
   }
 
-  if (tableFiles.length > 0) {
-    const pathParts = tableFiles[0].webkitRelativePath.split('/');
-    const datasetFolder = pathParts.find(p => p.endsWith('.Dataset') || p.endsWith('.SemanticModel'));
-    if (datasetFolder) {
-      model.datasetName = datasetFolder.replace('.Dataset', '').replace('.SemanticModel', '');
-    }
+  // --- PARSING STRATEGY ---
+  // 1. If model.bim exists, it is the source of truth (JSON format)
+  // 2. Else, use TMDL files
+
+  if (modelBimFile) {
+      const text = await modelBimFile.text();
+      try {
+          parseModelBim(text, model);
+      } catch (e) {
+          console.error("Error parsing model.bim", e);
+      }
+  } else {
+      // TMDL Parsing
+      if (tableFiles.length > 0) {
+        const pathParts = tableFiles[0].webkitRelativePath.split('/');
+        const datasetFolder = pathParts.find(p => p.endsWith('.Dataset') || p.endsWith('.SemanticModel'));
+        if (datasetFolder) {
+          model.datasetName = datasetFolder.replace('.Dataset', '').replace('.SemanticModel', '');
+        }
+      }
+
+      for (const file of tableFiles) {
+        const text = await file.text();
+        if (text.includes('table ')) { // Loose check first
+            const table = parseTmdlTableContent(text);
+            if (table) model.tables.push(table);
+        }
+      }
+
+      if (expressionsFile) {
+        const text = await expressionsFile.text();
+        const { parameters, sharedTables } = parseExpressionsTmdl(text);
+        model.parameters.push(...parameters);
+        if (sharedTables.length > 0) {
+           model.tables.push(...sharedTables);
+        }
+      }
+
+      if (relationshipsFile) {
+        const text = await relationshipsFile.text();
+        model.relationships = parseRelationshipsTmdl(text);
+      }
+
+      if (modelTmdlFile) {
+          const text = await modelTmdlFile.text();
+          model.roles = parseRolesTmdl(text);
+      }
   }
 
-  for (const file of tableFiles) {
-    const text = await file.text();
-    if (text.trim().startsWith('table')) {
-        const table = parseTmdlTableContent(text);
-        if (table) model.tables.push(table);
-    }
-  }
-
-  if (expressionsFile) {
-    const text = await expressionsFile.text();
-    const { parameters, sharedTables } = parseExpressionsTmdl(text);
-    model.parameters.push(...parameters);
-    if (sharedTables.length > 0) {
-       model.tables.push(...sharedTables);
-    }
-  }
-
-  if (relationshipsFile) {
-    const text = await relationshipsFile.text();
-    model.relationships = parseRelationshipsTmdl(text);
-  }
-
-  if (modelTmdlFile) {
-      const text = await modelTmdlFile.text();
-      model.roles = parseRolesTmdl(text);
-  }
-
+  // Report Parsing (Universal)
   if (reportJsonFile) {
       try {
           const text = await reportJsonFile.text();
@@ -212,7 +234,165 @@ export const parsePBIPData = async (files: FileList): Promise<PBIModel> => {
   return model;
 };
 
-// --- PARSERS ---
+// --- JSON PARSER (MODEL.BIM) ---
+
+const parseModelBim = (content: string, model: PBIModel) => {
+    const json = JSON.parse(content);
+    const modelJson = json.model || json;
+    
+    // Dataset Name
+    model.datasetName = modelJson.name || 'Dataset';
+
+    // Tables
+    if (modelJson.tables) {
+        modelJson.tables.forEach((t: any) => {
+            // Ignore System Tables
+            if (t.name.startsWith('LocalDateTable_') || t.name.startsWith('DateTableTemplate_')) return;
+
+            // Partitions (Source Code)
+            const partitions: any[] = [];
+            let sourceExpr = '';
+            let mode = 'Import';
+            
+            if (t.partitions) {
+                t.partitions.forEach((p: any) => {
+                    let source = '';
+                    if (p.source && p.source.expression) {
+                        source = Array.isArray(p.source.expression) 
+                            ? p.source.expression.join('\n') 
+                            : p.source.expression;
+                    }
+                    partitions.push({
+                        name: p.name,
+                        source: source,
+                        mode: p.mode || 'Import'
+                    });
+                    if (source) sourceExpr = source;
+                    if (p.mode) mode = p.mode;
+                });
+            }
+
+            // Columns
+            const columns: PBIColumn[] = [];
+            if (t.columns) {
+                t.columns.forEach((c: any) => {
+                    columns.push({
+                        name: c.name,
+                        dataType: c.dataType || 'unknown',
+                        isHidden: c.isHidden === true,
+                        description: c.description,
+                        sourceColumn: c.sourceColumn,
+                        expression: c.expression, // For calculated columns
+                        summarizeBy: c.summarizeBy,
+                        isUsedInReport: false
+                    });
+                });
+            }
+
+            // Measures
+            const measures: PBIMeasure[] = [];
+            if (t.measures) {
+                t.measures.forEach((m: any) => {
+                    let expression = m.expression;
+                    if (Array.isArray(expression)) expression = expression.join('\n');
+                    
+                    // Annotations
+                    const annotations: Record<string, string> = {};
+                    if (m.annotations) {
+                        m.annotations.forEach((a: any) => {
+                            annotations[a.name] = a.value;
+                        });
+                    }
+
+                    measures.push({
+                        name: m.name,
+                        expression: expression || '',
+                        description: m.description,
+                        formatString: m.formatString,
+                        lineageTag: m.lineageTag,
+                        annotations: annotations,
+                        dependencies: [],
+                        isUsedInReport: false,
+                        parentTable: t.name
+                    });
+                });
+            }
+
+            // Determine Type
+            let tableType: 'Import' | 'DirectQuery' | 'Calculated' | 'Unknown' = 'Import';
+            let isParameter = false;
+            let isUDF = false;
+            
+            if (mode === 'DirectQuery') tableType = 'DirectQuery';
+            
+            // Check for Calculated Table
+            const partitionSourceType = t.partitions?.[0]?.source?.type;
+            if (partitionSourceType === 'calculated') tableType = 'Calculated';
+
+            // Heuristics for special tables
+            if (sourceExpr.includes('NAMEOF') && sourceExpr.includes('IsParameterQuery=true')) isParameter = true;
+            if (sourceExpr.trim().startsWith('(') || sourceExpr.includes('=>')) isUDF = true;
+
+            model.tables.push({
+                name: t.name,
+                columns,
+                measures,
+                partitions,
+                sourceExpression: sourceExpr,
+                description: t.description,
+                type: tableType,
+                isCalculationGroup: t.calculationGroup !== undefined,
+                isParameter,
+                isUDF
+            });
+        });
+    }
+
+    // Relationships
+    if (modelJson.relationships) {
+        modelJson.relationships.forEach((r: any) => {
+            // Strict Filter for relationships to Auto Date/Time tables
+            if (r.fromTable.startsWith('LocalDateTable_') || r.toTable.startsWith('LocalDateTable_') || 
+                r.fromTable.startsWith('DateTableTemplate_') || r.toTable.startsWith('DateTableTemplate_')) {
+                return;
+            }
+
+            model.relationships.push({
+                fromTable: r.fromTable,
+                fromColumn: r.fromColumn,
+                toTable: r.toTable,
+                toColumn: r.toColumn,
+                cardinality: r.cardinality || 'Many', 
+                crossFilteringBehavior: r.crossFilteringBehavior || 'Automatic',
+                isActive: r.isActive !== false 
+            });
+        });
+    }
+
+    // Roles (RLS)
+    if (modelJson.roles) {
+        modelJson.roles.forEach((r: any) => {
+            const perms: {table: string, expression: string}[] = [];
+            if (r.tablePermissions) {
+                r.tablePermissions.forEach((tp: any) => {
+                    let expr = tp.filterExpression;
+                    if (Array.isArray(expr)) expr = expr.join('\n');
+                    perms.push({
+                        table: tp.name,
+                        expression: expr
+                    });
+                });
+            }
+            model.roles.push({
+                name: r.name,
+                modelPermission: r.modelPermission,
+                tablePermissions: perms
+            });
+        });
+    }
+};
+
+// --- TMDL PARSERS (UPDATED WITH /// SUPPORT) ---
 
 const parseTmdlTableContent = (content: string): PBITable | null => {
   const reader = new LineReader(content);
@@ -221,24 +401,78 @@ const parseTmdlTableContent = (content: string): PBITable | null => {
     isCalculationGroup: false, isParameter: false, isUDF: false
   };
 
-  while (reader.hasNext() && (reader.peek().trim().startsWith('//') || !reader.peek().trim())) reader.next();
-  if (!reader.hasNext()) return null;
+  // 1. Parse Pre-Table Header (for Table Description)
+  let pendingDescription = '';
+  
+  while (reader.hasNext()) {
+      const line = reader.peek().trim();
+      
+      // Capture Documentation Comments (///)
+      if (line.startsWith('///')) {
+          const desc = line.substring(3).trim();
+          pendingDescription = pendingDescription ? pendingDescription + '\n' + desc : desc;
+          reader.next();
+      } 
+      // Skip Standard Comments (//) but don't break the loop
+      else if (line.startsWith('//')) {
+          reader.next(); 
+      }
+      // Empty lines usually break description association, but for table headers we might be lenient
+      // or we can stick to C# rules where blank lines break it. Let's break on blank line.
+      else if (!line) {
+          pendingDescription = ''; // Reset
+          reader.next();
+      }
+      else {
+          break; // Hit code (likely 'table ...')
+      }
+  }
 
+  // 2. Parse Table Definition
+  if (!reader.hasNext()) return null;
   const headerLine = reader.next().trim();
   const tableMatch = headerLine.match(/^table\s+(.+)/);
   if (!tableMatch) return null;
+  
   table.name = cleanName(tableMatch[1]);
+  
+  // Strict filter for Auto Date/Time tables
+  if (table.name.startsWith('LocalDateTable_') || table.name.startsWith('DateTableTemplate_')) {
+      return null;
+  }
+
+  if (pendingDescription) {
+      table.description = pendingDescription;
+      pendingDescription = ''; // Reset for internal items
+  }
 
   let currentSection: 'column' | 'measure' | 'partition' | 'calculationItem' | 'none' = 'none';
   let currentItem: any = null;
   let currentBaseIndent = 0;
 
+  // 3. Parse Body
   while (reader.hasNext()) {
     const line = reader.peek();
     const indent = reader.currentLineIndent();
     const trimmed = line.trim();
 
-    if (!trimmed || trimmed.startsWith('//')) {
+    // -- HANDLE DESCRIPTIONS (///) --
+    if (trimmed.startsWith('///')) {
+        const desc = trimmed.substring(3).trim();
+        pendingDescription = pendingDescription ? pendingDescription + '\n' + desc : desc;
+        reader.next();
+        continue;
+    }
+
+    // -- HANDLE COMMENTS (//) --
+    if (trimmed.startsWith('//')) {
+      reader.next();
+      continue;
+    }
+
+    // -- HANDLE EMPTY LINES --
+    if (!trimmed) {
+      pendingDescription = ''; // Blank lines break documentation association
       reader.next();
       continue;
     }
@@ -253,8 +487,13 @@ const parseTmdlTableContent = (content: string): PBITable | null => {
         finalizeItem(table, currentSection, currentItem);
         currentSection = 'column';
         currentItem = { 
-            name: cleanName(trimmed.substring(7)), dataType: 'string', isHidden: false, isUsedInReport: false 
+            name: cleanName(trimmed.substring(7)), 
+            dataType: 'string', 
+            isHidden: false, 
+            isUsedInReport: false,
+            description: pendingDescription // Apply accumulated description
         };
+        pendingDescription = ''; // Consume description
         currentBaseIndent = indent;
         reader.next();
     } 
@@ -280,10 +519,11 @@ const parseTmdlTableContent = (content: string): PBITable | null => {
             isUsedInReport: false, 
             parentTable: table.name,
             isCalculationItem: isCalcItem,
-            annotations: {}
+            annotations: {},
+            description: pendingDescription // Apply accumulated description
         };
+        pendingDescription = ''; // Consume description
         reader.next();
-        // Don't consume next lines blindly here
     }
     else if (trimmed.startsWith('partition ')) {
         finalizeItem(table, currentSection, currentItem);
@@ -297,6 +537,8 @@ const parseTmdlTableContent = (content: string): PBITable | null => {
             name = cleanName(trimmed.substring(10));
         }
         currentItem = { name, source: '', mode: 'Import' };
+        // Partitions generally don't have user-facing descriptions in the same way, but could support it.
+        pendingDescription = ''; 
         reader.next();
     }
     else {
@@ -310,11 +552,11 @@ const parseTmdlTableContent = (content: string): PBITable | null => {
                 const key = propMatch[1];
                 const value = propMatch[2];
                 
-                // Whitelist valid properties to prevent DAX confusion
+                // Whitelist valid properties
                 let isKnownProperty = false;
                 const measureProps = ['formatString', 'lineageTag', 'description', 'displayFolder', 'kpi', 'dataCategory', 'state', 'changedProperty', 'extendedProperties'];
                 const colProps = ['dataType', 'isHidden', 'sourceColumn', 'summarizeBy', 'formatString', 'lineageTag', 'description', 'displayFolder', 'dataCategory', 'changedProperty'];
-                const partitionProps = ['mode', 'source'];
+                const partitionProps = ['mode']; // 'source' is handled separately below
 
                 if (currentSection === 'measure' || currentSection === 'calculationItem') {
                     if (measureProps.includes(key)) isKnownProperty = true;
@@ -327,7 +569,9 @@ const parseTmdlTableContent = (content: string): PBITable | null => {
                 if (isKnownProperty) {
                     if (key === 'formatString') { currentItem.formatString = value.replace(/^"|"$/g, ''); }
                     else if (key === 'lineageTag') { currentItem.lineageTag = value.replace(/^"|"$/g, ''); }
-                    else if (key === 'description') { currentItem.description = value.replace(/^"|"$/g, ''); }
+                    else if (key === 'description') { 
+                        currentItem.description = value.replace(/^"|"$/g, ''); 
+                    }
                     else if (key === 'dataType' && currentSection === 'column') { currentItem.dataType = value; }
                     else if (key === 'isHidden' && currentSection === 'column') { currentItem.isHidden = value.trim() === 'true'; }
                     else if (key === 'sourceColumn' && currentSection === 'column') { currentItem.sourceColumn = cleanName(value); }
@@ -354,11 +598,29 @@ const parseTmdlTableContent = (content: string): PBITable | null => {
                  continue;
             }
 
-            // Source (Partition)
+            // Source (Partition) - Fixed Logic
             if (trimmed.startsWith('source =')) {
                 if (currentSection === 'partition') {
-                    reader.next();
-                    currentItem.source = extractMultiLineString(reader, indent + 1);
+                    // Extract inline source if available (e.g. source = expression)
+                    const sourceMatch = trimmed.match(/^source\s*=\s*(.*)/);
+                    let initialSource = '';
+                    if (sourceMatch && sourceMatch[1]) {
+                        initialSource = sourceMatch[1].trim();
+                    }
+                    
+                    reader.next(); // Consume 'source =' line
+                    
+                    // Capture following indented block
+                    const multiLine = extractMultiLineString(reader, indent + 1);
+                    
+                    // Combine inline + block
+                    if (initialSource && multiLine) {
+                        currentItem.source = initialSource + '\n' + multiLine;
+                    } else if (initialSource) {
+                        currentItem.source = initialSource;
+                    } else {
+                        currentItem.source = multiLine.trim(); // Trim leading newline from utility
+                    }
                 } else {
                     reader.next();
                 }
@@ -366,18 +628,11 @@ const parseTmdlTableContent = (content: string): PBITable | null => {
             }
 
             // Expression Continuation (Measure/CalcItem)
-            // Preserving indentation logic
             if (currentSection === 'measure' || currentSection === 'calculationItem') {
                 if (currentItem) {
-                    // Normalize indentation: remove base indent, replace with spaces for consistency
                     let lineToAdd = trimmed;
                     if (indent > currentBaseIndent) {
-                         // We maintain the relative indentation
-                         // Assuming 1 visual unit per extra indent level.
-                         // Using spaces to guarantee display in HTML/Code blocks
                          const relativeIndent = indent - currentBaseIndent;
-                         // Add spaces. We can map 1 indent unit = 2 spaces or just 1.
-                         // Let's use exact count to be safe.
                          lineToAdd = ' '.repeat(relativeIndent) + trimmed;
                     }
                     
@@ -393,6 +648,7 @@ const parseTmdlTableContent = (content: string): PBITable | null => {
 
             reader.next();
         } else {
+            // Not in a section, just consume
             reader.next();
         }
     }
@@ -466,7 +722,9 @@ const extractMultiLineString = (reader: LineReader, minIndent: number): string =
         const indent = reader.currentLineIndent();
         const line = reader.peek();
         if (line.trim().length > 0 && indent < minIndent) break;
-        buffer.push(reader.next().trim());
+        buffer.push(reader.next().trim()); // Keep indentation? Usually trimming is safer for display, but for code structure... 
+        // TMDL blocks usually strip base indentation. The LineReader.next() returns raw line.
+        // We trim here for simplicity, but strictly we should keep relative indent.
     }
     return buffer.length > 0 ? '\n' + buffer.join('\n') : '';
 };
@@ -531,10 +789,17 @@ const parseRelationshipsTmdl = (content: string): PBIRelationship[] => {
             if (fromCol && toCol) {
                 const [fTable, fCol] = fromCol.split(/\.(.+)/);
                 const [tTable, tCol] = toCol.split(/\.(.+)/);
-                rels.push({
-                    fromTable: fTable, fromColumn: fCol, toTable: tTable, toColumn: tCol,
-                    cardinality: cardinality as any, crossFilteringBehavior: crossFilter as any, isActive
-                });
+                
+                // Strict Check for Auto Date/Time tables
+                const isSystemTable = fTable.startsWith('LocalDateTable_') || tTable.startsWith('LocalDateTable_') || 
+                                    fTable.startsWith('DateTableTemplate_') || tTable.startsWith('DateTableTemplate_');
+
+                if (!isSystemTable) {
+                    rels.push({
+                        fromTable: fTable, fromColumn: fCol, toTable: tTable, toColumn: tCol,
+                        cardinality: cardinality as any, crossFilteringBehavior: crossFilter as any, isActive
+                    });
+                }
             }
         } else {
             reader.next();
