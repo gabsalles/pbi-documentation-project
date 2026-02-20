@@ -20,6 +20,9 @@ jobs:
 
       - name: Instalar dependências (npm install)
         run: npm install
+      
+      - name: Verificar Vulnerabilidades (Security Audit)
+        run: npm audit --audit-level=high
 
       - name: Compilar o React e Gerar o Executável (.exe)
         run: npm run electron:build:win
