@@ -5,7 +5,7 @@ function createWindow () {
   const win = new BrowserWindow({
     width: 1280,
     height: 800,
-    // icon: path.join(__dirname, 'public/icon.ico'), // Descomente quando tiver o ícone pronto!
+    icon: path.join(__dirname, 'build', 'icon.ico'), // Descomente quando tiver o ícone pronto!
     autoHideMenuBar: true, // Esconde aquela barra "Arquivo, Editar, Exibir"
     webPreferences: {
       nodeIntegration: true,
