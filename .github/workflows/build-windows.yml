@@ -29,9 +29,13 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Disponibilizar o .exe para Download
-        uses: actions/upload-artifact@v4
+      - name: Criar Release Automática
+        if: startsWith(github.ref, 'refs/tags/v') # Só roda se for uma tag de versão
+        uses: softprops/action-gh-release@v2
         with:
-          name: Instalador-Bradesco-BI-Docs
-          path: release/*.exe
-          retention-days: 7 # Guarda o arquivo nos servidores do GitHub por 7 dias
+          files: |
+            release/*.exe
+          name: Version ${{ github.ref_name }}
+          generate_release_notes: true # Cria automaticamente a lista de mudanças
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
