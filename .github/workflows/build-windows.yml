@@ -3,6 +3,7 @@ name: Build Desktop App (Windows)
 on:
   push:
     branches: [ "main", "master" ] # Roda sozinho quando você subir código pra main/master
+    tags: ["v*"]
   workflow_dispatch: # Cria um botãozinho para você rodar manualmente quando quiser
 
 jobs:
