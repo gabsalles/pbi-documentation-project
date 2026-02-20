@@ -1,5 +1,7 @@
 {
-  "name": "bradesco-pbip-docgen",
+  "name": "daxilizer-pbip-docgen",
+  "author": "Gabriel GC Sales",
+  "description": "Ferramenta de documentação para projetos Power BI",
   "private": true,
   "version": "1.0.0",
   "type": "module",
@@ -33,7 +35,7 @@
     "vite": "^6.2.0"
   },
   "build": {
-    "appId": "com.bradesco.pbidocs",
+    "appId": "com.daxilizer.pbidocs",
     "productName": "BI Docs",
     "directories": {
       "output": "release"
@@ -43,6 +45,7 @@
       "electron-main.cjs"
     ],
     "win": {
+      "icon": "build/icon.ico",
       "target": [
         "nsis",
         "portable"
