@@ -10,7 +10,16 @@ const escapeHtml = (unsafe: string | undefined | null): string => {
     .replace(/'/g, "&#039;");
 };
 
-export const generateStaticHtml = (model: PBIModel, customTitle?: string, primaryColor?: string, logoBase64?: string | null): string => {
+export const generateStaticHtml = (
+  model: PBIModel, 
+  customTitle?: string, 
+  primaryColor?: string, 
+  logoBase64?: string | null,
+  customSubtitle?: string,
+  authorName?: string,
+  executiveSummary?: string,
+  classification?: string
+): string => {
   const now = new Date().toLocaleDateString('pt-BR');
   // const safeDatasetName = escapeHtml(model.datasetName);
 
@@ -454,14 +463,40 @@ export const generateStaticHtml = (model: PBIModel, customTitle?: string, primar
     <!-- MAIN CONTENT -->
     <main class="main">
         <div class="container">
-            <header>
-                <div class="header-badge">Gerado em: ${now}</div>
-                <h1>${safeDatasetName}</h1>
-                <div class="subtitle">Documentação Técnica PBIP V3.0</div>
+            <header style="display: flex; justify-content: space-between; align-items: flex-start;">
+                <div>
+                    <div class="header-badge">
+                        Gerado em: ${now} 
+                        ${authorName ? `<span style="margin: 0 8px; color: #D1D5DB;">|</span> Responsável: <b style="color: var(--brand-dark); margin-left: 4px;">${escapeHtml(authorName)}</b>` : ''}
+                    </div>
+                    <h1>${safeDatasetName}</h1>
+                    <div class="subtitle">${customSubtitle ? escapeHtml(customSubtitle) : 'Documentação Técnica de Modelo Semântico'}</div>
+                </div>
+                
+                <div style="text-align: right; display: flex; flex-direction: column; align-items: flex-end; gap: 12px;">
+                    ${logoBase64 ? `<img src="${logoBase64}" alt="Logo da Empresa" style="max-height: 60px; max-width: 200px; object-fit: contain;" />` : ''}
+                    
+                    ${classification ? (() => {
+                        let classColor = '#2563EB', classBg = '#EFF6FF', classBorder = '#BFDBFE'; // Azul (Uso Interno)
+                        if (classification === 'Público') { classColor = '#059669'; classBg = '#ECFDF5'; classBorder = '#A7F3D0'; } // Verde
+                        else if (classification === 'Confidencial') { classColor = '#D97706'; classBg = '#FFFBEB'; classBorder = '#FDE68A'; } // Laranja
+                        else if (classification === 'Restrito') { classColor = '#DC2626'; classBg = '#FEF2F2'; classBorder = '#FECACA'; } // Vermelho
+                        
+                        return `<div style="display: inline-block; padding: 6px 12px; border-radius: 6px; font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em; color: ${classColor}; background: ${classBg}; border: 1px solid ${classBorder}; box-shadow: 0 1px 2px rgba(0,0,0,0.05);">
+                            ${escapeHtml(classification)}
+                        </div>`;
+                    })() : ''}
+                </div>
             </header>
 
             <!-- 1. OVERVIEW -->
             <div id="overview" class="section active">
+                ${executiveSummary ? `
+                    <div class="card" style="margin-bottom: 24px; border-left: 4px solid var(--brand-red);">
+                        <div class="card-header"><h3 class="card-title">Resumo Executivo</h3></div>
+                        <div style="padding: 20px 24px; color: var(--text-secondary); line-height: 1.6; white-space: pre-wrap; font-size: 14px;">${escapeHtml(executiveSummary)}</div>
+                    </div>
+                    ` : ''}
                 <div class="stats-grid">
                     <div class="widget red">
                         <div class="widget-lbl">Tabelas</div>
