@@ -49,7 +49,7 @@ const FileUpload: React.FC<FileUploadProps> = ({ onUpload, loading }) => {
 
         <div
           className={`relative border-2 border-dashed rounded-xl p-12 transition-all duration-300 ${
-            dragActive ? "border-brand-primary bg-red-50" : "border-gray-300 bg-white"
+            dragActive ? "border-brand-primary bg-blue-50" : "border-gray-300 bg-white"
           }`}
           onDragEnter={handleDrag}
           onDragLeave={handleDrag}
@@ -63,7 +63,7 @@ const FileUpload: React.FC<FileUploadProps> = ({ onUpload, loading }) => {
              </div>
           ) : (
             <div className="flex flex-col items-center">
-              <div className="bg-red-100 p-4 rounded-full mb-4">
+              <div className="bg-blue-100 p-4 rounded-full mb-4">
                  <Upload size={32} className="text-brand-primary" />
               </div>
               <p className="text-lg font-semibold text-brand-dark mb-2">

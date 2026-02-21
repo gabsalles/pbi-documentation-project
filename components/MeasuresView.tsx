@@ -44,7 +44,7 @@ const MeasuresView: React.FC<MeasuresViewProps> = ({ model }) => {
                 </button>
                 <button 
                     onClick={() => setUsageFilter('unused')}
-                    className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${usageFilter === 'unused' ? 'bg-red-50 text-red-700 border border-red-200' : 'text-gray-500 hover:bg-gray-50'}`}
+                    className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${usageFilter === 'unused' ? 'bg-blue-50 text-red-700 border border-red-200' : 'text-gray-500 hover:bg-gray-50'}`}
                 >
                     Não Utilizadas
                 </button>
@@ -71,7 +71,7 @@ const MeasuresView: React.FC<MeasuresViewProps> = ({ model }) => {
                 {/* HEADER */}
                 <div className="p-4 border-b border-gray-100 bg-white flex justify-between items-start">
                     <div className="flex items-start space-x-3">
-                         <div className={`p-2 rounded-lg mt-1 ${measure.isCalculationItem ? 'bg-purple-100 text-purple-600' : 'bg-red-50 text-brand-primary'}`}>
+                         <div className={`p-2 rounded-lg mt-1 ${measure.isCalculationItem ? 'bg-purple-100 text-purple-600' : 'bg-blue-50 text-brand-primary'}`}>
                              {measure.isCalculationItem ? <FileType size={20} /> : <Calculator size={20} />}
                          </div>
                          <div>

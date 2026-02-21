@@ -117,7 +117,7 @@ const ReportView: React.FC<ReportViewProps> = ({ model, onUpdatePage }) => {
                             <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
                                 <button 
                                     onClick={() => removeImage(idx)}
-                                    className="bg-red-500 text-white p-2 rounded-lg shadow-lg hover:bg-red-600 transition-colors"
+                                    className="bg-blue-500 text-white p-2 rounded-lg shadow-lg hover:bg-blue-600 transition-colors"
                                     title="Remover Imagem"
                                 >
                                     <Trash2 size={16} />
@@ -156,7 +156,7 @@ const ReportView: React.FC<ReportViewProps> = ({ model, onUpdatePage }) => {
                  <div className="p-5">
                     {/* Page Level Hidden Filters */}
                     {page.hiddenFilters && page.hiddenFilters.length > 0 && (
-                        <div className="mb-6 bg-red-50 p-3 rounded-lg border border-red-100">
+                        <div className="mb-6 bg-blue-50 p-3 rounded-lg border border-red-100">
                              <h4 className="text-xs font-bold text-red-800 uppercase mb-2 flex items-center">
                                  <Filter size={12} className="mr-1"/> Filtros de Página (Ocultos/Fixos)
                              </h4>
@@ -181,7 +181,7 @@ const ReportView: React.FC<ReportViewProps> = ({ model, onUpdatePage }) => {
                             return (
                             <div key={vIdx} className="border border-gray-200 rounded-lg p-3 hover:shadow-md transition-shadow bg-gray-50 flex flex-col h-full relative overflow-hidden group">
                                 {visual.hiddenFilters && visual.hiddenFilters.length > 0 && (
-                                     <div className="absolute top-0 right-0 w-4 h-4 bg-red-500 rounded-bl-lg flex items-center justify-center z-10" title="Possui filtros ocultos">
+                                     <div className="absolute top-0 right-0 w-4 h-4 bg-blue-500 rounded-bl-lg flex items-center justify-center z-10" title="Possui filtros ocultos">
                                          <EyeOff size={10} className="text-white" />
                                      </div>
                                 )}
@@ -201,7 +201,7 @@ const ReportView: React.FC<ReportViewProps> = ({ model, onUpdatePage }) => {
                                     <div className="space-y-1 flex-1 mb-2">
                                         {/* Measures First */}
                                         {visual.measuresUsed.map((meas, i) => (
-                                            <div key={`m-${i}`} className="text-xs text-brand-primary bg-red-50 border border-red-100 px-2 py-1 rounded truncate flex items-center">
+                                            <div key={`m-${i}`} className="text-xs text-brand-primary bg-blue-50 border border-red-100 px-2 py-1 rounded truncate flex items-center">
                                                 <Calculator size={10} className="mr-1.5 flex-shrink-0" />
                                                 {meas}
                                             </div>
@@ -268,7 +268,7 @@ const ReportView: React.FC<ReportViewProps> = ({ model, onUpdatePage }) => {
                                         </div>
                                         <div className="flex flex-wrap gap-1">
                                             {visual.hiddenFilters.slice(0, 2).map(f => (
-                                                <span key={f} className="text-[10px] bg-red-50 text-red-800 px-1 rounded border border-red-100 truncate max-w-full">{f}</span>
+                                                <span key={f} className="text-[10px] bg-blue-50 text-red-800 px-1 rounded border border-red-100 truncate max-w-full">{f}</span>
                                             ))}
                                             {visual.hiddenFilters.length > 2 && <span className="text-[10px] text-gray-400">...</span>}
                                         </div>

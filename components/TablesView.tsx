@@ -62,7 +62,7 @@ const TablesView: React.FC<TablesViewProps> = ({ tables }) => {
             </button>
             <button 
                 onClick={() => setUsageFilter('unused')}
-                className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${usageFilter === 'unused' ? 'bg-red-50 text-red-700 border border-red-200' : 'text-gray-500 hover:bg-gray-50'}`}
+                className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${usageFilter === 'unused' ? 'bg-blue-50 text-red-700 border border-red-200' : 'text-gray-500 hover:bg-gray-50'}`}
             >
                 Não Utilizadas
             </button>
@@ -173,7 +173,7 @@ const TablesView: React.FC<TablesViewProps> = ({ tables }) => {
                                                             Sim
                                                         </span>
                                                     ) : (
-                                                        <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-800">
+                                                        <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-red-800">
                                                             Não
                                                         </span>
                                                     )}

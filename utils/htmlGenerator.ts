@@ -90,8 +90,8 @@ export const generateStaticHtml = (model: PBIModel): string => {
     @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&display=swap');
 
     :root {
-        --brand-red: #CC092F;
-        --brand-red-hover: #b30022;
+        --brand-red: #1a6aff;        /* Azul vibrante (Base) */
+        --brand-red-hover: #00e8ff;  /* Ciano néon (Destaque/Glow) */
         --brand-dark: #1F1F1F;
         --brand-gray-bg: #F3F4F6;
         --brand-surface: #FFFFFF;
@@ -412,7 +412,7 @@ export const generateStaticHtml = (model: PBIModel): string => {
     <!-- SIDEBAR -->
     <nav class="sidebar">
         <div class="brand-header">
-            <div class="logo-text">BRADESCO <span>BI DOCS</span></div>
+            <div class="logo-text">DAXILIZER <span>BI DOCS</span></div>
         </div>
         <div class="nav-links">
             <a class="nav-item active" onclick="switchTab('overview', this)">
@@ -745,7 +745,7 @@ export const generateStaticHtml = (model: PBIModel): string => {
             themeVariables: {
                 primaryColor: '#ffffff',
                 primaryTextColor: '#1F1F1F',
-                primaryBorderColor: '#CC092F',
+                primaryBorderColor: '#00e8ff',
                 lineColor: '#666666'
             }
         });

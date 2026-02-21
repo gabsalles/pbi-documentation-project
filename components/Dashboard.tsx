@@ -24,7 +24,7 @@ const Dashboard: React.FC<DashboardProps> = ({ model }) => {
     { name: 'Não Utilizadas', value: unusedMeasures },
   ];
 
-  const COLORS = ['#CC092F', '#E5E7EB'];
+  const COLORS = ['#0d2060', '#E5E7EB'];
 
   return (
     <div className="p-6 space-y-6">

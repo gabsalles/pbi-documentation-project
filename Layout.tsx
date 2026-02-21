@@ -43,7 +43,7 @@ const Layout: React.FC<LayoutProps> = ({ currentView, onChangeView, children, mo
       {/* Sidebar */}
       <aside className="w-64 bg-white shadow-xl flex flex-col z-10 no-print">
         <div className="p-6 border-b border-gray-100 flex items-center justify-center bg-brand-primary">
-          <h1 className="text-white text-xl font-bold tracking-wide">BRADESCO <span className="font-light opacity-80">BI DOCS</span></h1>
+          <h1 className="text-white text-xl font-bold tracking-wide">DAXILIZER <span className="font-light opacity-80">BI DOCS</span></h1>
         </div>
 
         <nav className="flex-1 p-4 space-y-2 mt-4">
@@ -82,7 +82,7 @@ const Layout: React.FC<LayoutProps> = ({ currentView, onChangeView, children, mo
                     <Download size={16} className="mr-2" /> Exportar HTML
                  </button>
              )}
-             <p className="text-xs text-center text-gray-400 mt-4">v3.0.0 • Bradesco 2026</p>
+             <p className="text-xs text-center text-gray-400 mt-4">v3.0.0 • Daxilizer 2026</p>
         </div>
       </aside>
 

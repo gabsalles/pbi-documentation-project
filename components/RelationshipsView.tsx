@@ -35,7 +35,7 @@ const RelationshipsView: React.FC<RelationshipsViewProps> = ({ model }) => {
         themeVariables: {
             primaryColor: '#ffffff',
             primaryTextColor: '#1F1F1F',
-            primaryBorderColor: '#CC092F',
+            primaryBorderColor: '#0d2060',
             lineColor: '#666666',
             secondaryColor: '#f4f4f4',
             tertiaryColor: '#fff'
@@ -169,7 +169,7 @@ const RelationshipsView: React.FC<RelationshipsViewProps> = ({ model }) => {
     } catch (error) {
         console.error('Mermaid render error:', error);
         if (mermaidRef.current) {
-            mermaidRef.current.innerHTML = `<div class="p-4 text-red-500 text-sm font-mono border border-red-200 bg-red-50 rounded">Erro de sintaxe no diagrama: ${(error as Error).message}</div>`;
+            mermaidRef.current.innerHTML = `<div class="p-4 text-red-500 text-sm font-mono border border-red-200 bg-blue-50 rounded">Erro de sintaxe no diagrama: ${(error as Error).message}</div>`;
         }
     } finally {
         setIsRendering(false);
