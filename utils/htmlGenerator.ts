@@ -10,9 +10,13 @@ const escapeHtml = (unsafe: string | undefined | null): string => {
     .replace(/'/g, "&#039;");
 };
 
-export const generateStaticHtml = (model: PBIModel): string => {
+export const generateStaticHtml = (model: PBIModel, customTitle?: string, primaryColor?: string): string => {
   const now = new Date().toLocaleDateString('pt-BR');
-  const safeDatasetName = escapeHtml(model.datasetName);
+  // const safeDatasetName = escapeHtml(model.datasetName);
+
+  // Usa o título personalizado se existir, senão usa o nome original do dataset
+  const titleToUse = customTitle || model.datasetName;
+  const safeDatasetName = escapeHtml(titleToUse);
   
   // Calculate Stats
   const totalTables = model.tables.length;
@@ -90,7 +94,7 @@ export const generateStaticHtml = (model: PBIModel): string => {
     @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&display=swap');
 
     :root {
-        --brand-red: #1a6aff;        /* Azul vibrante (Base) */
+        --brand-red: ${primaryColor || '#1a6aff'}; /* Cor personalizada ou azul base */
         --brand-red-hover: #00e8ff;  /* Ciano néon (Destaque/Glow) */
         --brand-dark: #1F1F1F;
         --brand-gray-bg: #F3F4F6;

@@ -1,7 +1,7 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { FileText, Database, Calculator, GitMerge, LayoutDashboard, Printer, Download, Shield } from 'lucide-react';
 import { generateStaticHtml } from "@/utils/htmlGenerator";
-import { PBIModel } from '../types';
+import { PBIModel } from './types'; // Ajustado para apontar para a raiz
 
 interface LayoutProps {
   currentView: string;
@@ -11,6 +11,10 @@ interface LayoutProps {
 }
 
 const Layout: React.FC<LayoutProps> = ({ currentView, onChangeView, children, model }) => {
+  // 1. Criamos a "memória" para guardar o título e a cor escolhidos
+  const [exportTitle, setExportTitle] = useState('');
+  const [exportColor, setExportColor] = useState('#1a6aff');
+
   const navItems = [
     { id: 'dashboard', label: 'Visão Geral', icon: LayoutDashboard },
     { id: 'tables', label: 'Tabelas', icon: Database },
@@ -26,12 +30,13 @@ const Layout: React.FC<LayoutProps> = ({ currentView, onChangeView, children, mo
 
   const handleExportHtml = () => {
     if (!model) return;
-    const htmlContent = generateStaticHtml(model);
+    // 2. Passamos o título e a cor para o motor gerar o HTML
+    const htmlContent = generateStaticHtml(model, exportTitle, exportColor);
     const blob = new Blob([htmlContent], { type: 'text/html' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `Documentacao_${model.datasetName || 'PBIP'}.html`;
+    a.download = `Documentacao_${exportTitle || model.datasetName || 'PBIP'}.html`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -67,7 +72,36 @@ const Layout: React.FC<LayoutProps> = ({ currentView, onChangeView, children, mo
           })}
         </nav>
 
-        <div className="p-4 border-t border-gray-100 space-y-2">
+        {/* 3. A zona inferior da barra lateral com os campos de personalização */}
+        <div className="p-4 border-t border-gray-100 space-y-3">
+             {model && (
+                 <div className="bg-gray-50 p-3 rounded-lg border border-gray-200 space-y-3 mb-2">
+                     <p className="text-xs font-semibold text-gray-500 uppercase">Personalizar Relatório</p>
+                     <div>
+                         <label className="text-xs text-gray-600 block mb-1">Título Principal</label>
+                         <input 
+                             type="text" 
+                             placeholder={model.datasetName}
+                             value={exportTitle}
+                             onChange={(e) => setExportTitle(e.target.value)}
+                             className="w-full text-sm p-1.5 border border-gray-300 rounded focus:outline-none focus:border-brand-secondary bg-white"
+                         />
+                     </div>
+                     <div>
+                         <label className="text-xs text-gray-600 block mb-1">Cor de Destaque</label>
+                         <div className="flex items-center gap-2">
+                             <input 
+                                 type="color" 
+                                 value={exportColor}
+                                 onChange={(e) => setExportColor(e.target.value)}
+                                 className="w-8 h-8 rounded cursor-pointer border-0 p-0"
+                             />
+                             <span className="text-xs font-mono text-gray-500 uppercase">{exportColor}</span>
+                         </div>
+                     </div>
+                 </div>
+             )}
+
              <button 
                 onClick={handlePrint}
                 className="flex items-center justify-center w-full py-2 border border-gray-300 rounded-lg text-gray-600 hover:bg-gray-50 text-sm font-medium transition-colors"
@@ -88,9 +122,11 @@ const Layout: React.FC<LayoutProps> = ({ currentView, onChangeView, children, mo
 
       {/* Main Content */}
       <main className="flex-1 overflow-auto bg-brand-gray relative">
-        {/* Print Header (Visible only in print) */}
+        {/* 4. Print Header (Visível apenas ao imprimir) usando as novas variáveis */}
         <div className="hidden print:block p-8 border-b border-gray-300 mb-8">
-            <h1 className="text-3xl font-bold text-brand-primary">Documentação Técnica Power BI</h1>
+            <h1 className="text-3xl font-bold" style={{ color: exportColor }}>
+                {exportTitle || 'Documentação Técnica Power BI'}
+            </h1>
             <p className="text-gray-500">Relatório gerado automaticamente para: {model?.datasetName}</p>
         </div>
 
