@@ -10,7 +10,7 @@ const escapeHtml = (unsafe: string | undefined | null): string => {
     .replace(/'/g, "&#039;");
 };
 
-export const generateStaticHtml = (model: PBIModel, customTitle?: string, primaryColor?: string): string => {
+export const generateStaticHtml = (model: PBIModel, customTitle?: string, primaryColor?: string, logoBase64?: string | null): string => {
   const now = new Date().toLocaleDateString('pt-BR');
   // const safeDatasetName = escapeHtml(model.datasetName);
 
@@ -146,7 +146,8 @@ export const generateStaticHtml = (model: PBIModel, customTitle?: string, primar
         display: flex;
         align-items: center;
         padding: 0 24px;
-        background: var(--brand-red);
+        background-color: var(--brand-red);
+        background-image: linear-gradient(135deg, rgba(255,255,255,0.15) 0%, rgba(0,0,0,0.15) 100%);
         color: white;
     }
 
@@ -169,7 +170,14 @@ export const generateStaticHtml = (model: PBIModel, customTitle?: string, primar
     }
 
     .nav-item:hover { background-color: #F9FAFB; color: var(--brand-dark); }
-    .nav-item.active { background-color: #FFF1F2; color: var(--brand-red); font-weight: 600; border-color: #FECDD3; }
+    .nav-item.active { 
+        background-color: var(--brand-red); 
+        background-image: linear-gradient(135deg, rgba(255,255,255,0.15) 0%, rgba(0,0,0,0.15) 100%);
+        color: white; 
+        font-weight: 600; 
+        border: none;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+    }
     .nav-icon { margin-right: 12px; display: flex; }
 
     /* Main Area */
@@ -415,8 +423,11 @@ export const generateStaticHtml = (model: PBIModel, customTitle?: string, primar
 
     <!-- SIDEBAR -->
     <nav class="sidebar">
-        <div class="brand-header">
-            <div class="logo-text">DAXILIZER <span>BI DOCS</span></div>
+        <div class="brand-header" style="justify-content: center;">
+            ${logoBase64 
+                ? `<img src="${logoBase64}" alt="Logo da Empresa" style="max-height: 40px; max-width: 200px; object-fit: contain;" />` 
+                : `<div class="logo-text">DAXILIZER <span>BI DOCS</span></div>`
+            }
         </div>
         <div class="nav-links">
             <a class="nav-item active" onclick="switchTab('overview', this)">
