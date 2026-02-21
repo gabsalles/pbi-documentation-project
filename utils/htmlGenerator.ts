@@ -18,7 +18,8 @@ export const generateStaticHtml = (
   customSubtitle?: string,
   authorName?: string,
   executiveSummary?: string,
-  classification?: string
+  classification?: string,
+  supportContact?: string
 ): string => {
   const now = new Date().toLocaleDateString('pt-BR');
   // const safeDatasetName = escapeHtml(model.datasetName);
@@ -471,16 +472,25 @@ export const generateStaticHtml = (
                     </div>
                     <h1>${safeDatasetName}</h1>
                     <div class="subtitle">${customSubtitle ? escapeHtml(customSubtitle) : 'Documentação Técnica de Modelo Semântico'}</div>
+                    
+                    ${supportContact ? `
+                    <div style="margin-top: 16px;">
+                        <a href="${supportContact.includes('@') && !supportContact.startsWith('http') ? 'mailto:' + supportContact : supportContact}" target="_blank" style="display: inline-flex; align-items: center; padding: 6px 12px; background: white; border: 1px solid #E5E7EB; border-radius: 6px; color: var(--text-secondary); text-decoration: none; font-size: 12px; font-weight: 500; box-shadow: 0 1px 2px rgba(0,0,0,0.05);">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: 6px;"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline></svg>
+                            Suporte Técnico: ${escapeHtml(supportContact)}
+                        </a>
+                    </div>
+                    ` : ''}
                 </div>
                 
                 <div style="text-align: right; display: flex; flex-direction: column; align-items: flex-end; gap: 12px;">
                     ${logoBase64 ? `<img src="${logoBase64}" alt="Logo da Empresa" style="max-height: 60px; max-width: 200px; object-fit: contain;" />` : ''}
                     
                     ${classification ? (() => {
-                        let classColor = '#2563EB', classBg = '#EFF6FF', classBorder = '#BFDBFE'; // Azul (Uso Interno)
-                        if (classification === 'Público') { classColor = '#059669'; classBg = '#ECFDF5'; classBorder = '#A7F3D0'; } // Verde
-                        else if (classification === 'Confidencial') { classColor = '#D97706'; classBg = '#FFFBEB'; classBorder = '#FDE68A'; } // Laranja
-                        else if (classification === 'Restrito') { classColor = '#DC2626'; classBg = '#FEF2F2'; classBorder = '#FECACA'; } // Vermelho
+                        let classColor = '#2563EB', classBg = '#EFF6FF', classBorder = '#BFDBFE'; 
+                        if (classification === 'Público') { classColor = '#059669'; classBg = '#ECFDF5'; classBorder = '#A7F3D0'; } 
+                        else if (classification === 'Confidencial') { classColor = '#D97706'; classBg = '#FFFBEB'; classBorder = '#FDE68A'; } 
+                        else if (classification === 'Restrito') { classColor = '#DC2626'; classBg = '#FEF2F2'; classBorder = '#FECACA'; } 
                         
                         return `<div style="display: inline-block; padding: 6px 12px; border-radius: 6px; font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em; color: ${classColor}; background: ${classBg}; border: 1px solid ${classBorder}; box-shadow: 0 1px 2px rgba(0,0,0,0.05);">
                             ${escapeHtml(classification)}

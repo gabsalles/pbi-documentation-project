@@ -20,6 +20,7 @@ const Layout: React.FC<LayoutProps> = ({ currentView, onChangeView, children, mo
   const [exportSummary, setExportSummary] = useState('');
   const [hideBranding, setHideBranding] = useState(false);
   const [exportClassification, setExportClassification] = useState('Uso Interno');
+  const [exportSupport, setExportSupport] = useState('');
 
   const navItems = [
     { id: 'dashboard', label: 'Visão Geral', icon: LayoutDashboard },
@@ -49,7 +50,7 @@ const Layout: React.FC<LayoutProps> = ({ currentView, onChangeView, children, mo
 
   const handleExportHtml = () => {
     if (!model) return;
-    const htmlContent = generateStaticHtml(model, exportTitle, exportColor, exportLogo, exportSubtitle, exportAuthor, exportSummary, exportClassification);
+    const htmlContent = generateStaticHtml(model, exportTitle, exportColor, exportLogo, exportSubtitle, exportAuthor, exportSummary, exportClassification, exportSupport);
     const blob = new Blob([htmlContent], { type: 'text/html' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -115,7 +116,10 @@ const Layout: React.FC<LayoutProps> = ({ currentView, onChangeView, children, mo
                          <label className="text-xs text-gray-600 block mb-1">Autor / Responsável</label>
                          <input type="text" placeholder="Ex: João Silva" value={exportAuthor} onChange={(e) => setExportAuthor(e.target.value)} className="w-full text-sm p-1.5 border border-gray-300 rounded focus:outline-none focus:border-brand-secondary bg-white" />
                      </div>
-
+                     <div>
+                         <label className="text-xs text-gray-600 block mb-1">Contacto de Suporte</label>
+                         <input type="text" placeholder="E-mail ou link de portal" value={exportSupport} onChange={(e) => setExportSupport(e.target.value)} className="w-full text-sm p-1.5 border border-gray-300 rounded focus:outline-none focus:border-brand-secondary bg-white" />
+                     </div>
                      <div>
                          <label className="text-xs text-gray-600 block mb-1">Resumo Executivo</label>
                          <textarea rows={3} placeholder="Objetivo de negócio deste modelo..." value={exportSummary} onChange={(e) => setExportSummary(e.target.value)} className="w-full text-sm p-1.5 border border-gray-300 rounded focus:outline-none focus:border-brand-secondary bg-white resize-none"></textarea>
@@ -184,6 +188,7 @@ const Layout: React.FC<LayoutProps> = ({ currentView, onChangeView, children, mo
                 <div className="text-gray-400 mt-3 text-sm flex gap-4">
                     <span>Gerado para: <b>{model?.datasetName}</b></span>
                     {exportAuthor && <span>| &nbsp; Responsável: <b>{exportAuthor}</b></span>}
+                    {exportSupport && <span>| &nbsp; Suporte: <b>{exportSupport}</b></span>}
                 </div>
             </div>
             <div className="flex flex-col items-end gap-3">
