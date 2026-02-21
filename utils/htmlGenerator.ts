@@ -484,8 +484,6 @@ export const generateStaticHtml = (
                 </div>
                 
                 <div style="text-align: right; display: flex; flex-direction: column; align-items: flex-end; gap: 12px;">
-                    ${logoBase64 ? `<img src="${logoBase64}" alt="Logo da Empresa" style="max-height: 60px; max-width: 200px; object-fit: contain;" />` : ''}
-                    
                     ${classification ? (() => {
                         let classColor = '#2563EB', classBg = '#EFF6FF', classBorder = '#BFDBFE'; 
                         if (classification === 'Público') { classColor = '#059669'; classBg = '#ECFDF5'; classBorder = '#A7F3D0'; } 
