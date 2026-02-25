@@ -143,7 +143,7 @@ export const parsePBIPData = async (files: FileList): Promise<PBIModel> => {
       for (const file of tableFiles) {
         const text = await file.text();
         if (text.includes('table ')) { // Loose check first
-            const table = parseTmdlTableContent(text);
+            const table = parseTmdlTableContent(text, (file as any).path); // O (file as any).path pega o caminho real no Electron
             if (table) model.tables.push(table);
         }
       }
@@ -394,11 +394,12 @@ const parseModelBim = (content: string, model: PBIModel) => {
 
 // --- TMDL PARSERS (UPDATED WITH /// SUPPORT) ---
 
-const parseTmdlTableContent = (content: string): PBITable | null => {
+const parseTmdlTableContent = (content: string, filePath?: string): PBITable | null => {
   const reader = new LineReader(content);
   let table: PBITable = {
     name: '', columns: [], measures: [], partitions: [], type: 'Import', description: '',
-    isCalculationGroup: false, isParameter: false, isUDF: false
+    isCalculationGroup: false, isParameter: false, isUDF: false,
+    sourceFilePath: filePath // <--- Adicione isso
   };
 
   // 1. Parse Pre-Table Header (for Table Description)

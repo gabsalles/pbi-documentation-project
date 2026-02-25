@@ -9,6 +9,7 @@ export interface PBIMeasure {
   isUsedInReport: boolean;
   parentTable: string;
   isCalculationItem?: boolean;
+  sourceFilePath?: string; // Caminho completo do arquivo .tmdl no Windows/Mac
 }
 
 export interface PBIColumn {
@@ -42,6 +43,7 @@ export interface PBITable {
   isCalculationGroup?: boolean;
   isParameter?: boolean;
   isUDF?: boolean;
+  sourceFilePath?: string; // Caminho completo do arquivo .tmdl no Windows/Mac
 }
 
 export interface PBIRelationship {

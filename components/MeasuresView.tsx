@@ -23,6 +23,29 @@ const MeasuresView: React.FC<MeasuresViewProps> = ({ model }) => {
     return matchesSearch && matchesFilter;
   });
 
+const [editingId, setEditingId] = useState<string | null>(null);
+const [tempDescription, setTempDescription] = useState('');
+
+const handleSave = async (measure: PBIMeasure) => {
+  if (!measure.sourceFilePath) return alert("Caminho do arquivo não encontrado!");
+
+  // Chama a ponte do Electron
+  const result = await (window as any).require('electron').ipcRenderer.invoke('save-description', {
+    filePath: measure.sourceFilePath,
+    itemName: measure.name,
+    newDescription: tempDescription,
+    type: 'measure'
+  });
+
+  if (result.success) {
+    measure.description = tempDescription; // Atualiza na memória local
+    setEditingId(null);
+    alert("Salvo com sucesso!");
+  } else {
+    alert("Erro: " + result.error);
+  }
+};
+
   return (
     <div className="p-6 space-y-6">
        <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-4">
@@ -97,21 +120,32 @@ const MeasuresView: React.FC<MeasuresViewProps> = ({ model }) => {
 
                 {/* DESCRIPTION BANNER */}
                 <div className="px-5 pt-4">
-                     {measure.description ? (
-                         <div className="flex items-start bg-blue-50 border border-blue-100 rounded-lg p-3">
-                             <FileText size={16} className="text-blue-500 mr-2 mt-0.5 flex-shrink-0" />
-                             <div>
-                                 <h4 className="text-xs font-bold text-blue-700 uppercase mb-1">Documentação</h4>
-                                 <p className="text-sm text-blue-900 leading-relaxed">{measure.description}</p>
-                             </div>
-                         </div>
-                     ) : (
-                         <div className="flex items-center text-gray-400 text-xs italic bg-gray-50 p-2 rounded border border-gray-100 border-dashed">
-                             <AlertCircle size={14} className="mr-2" />
-                             Sem documentação (descrição) disponível no modelo.
-                         </div>
-                     )}
-                </div>
+                    {editingId === uniqueId ? (
+                        <div className="space-y-2">
+                        <textarea 
+                            className="w-full p-2 text-sm border rounded-lg focus:ring-2 focus:ring-brand-primary"
+                            value={tempDescription}
+                            onChange={(e) => setTempDescription(e.target.value)}
+                            rows={3}
+                        />
+                        <div className="flex gap-2">
+                            <button onClick={() => handleSave(measure)} className="bg-green-600 text-white px-3 py-1 rounded text-xs">Salvar</button>
+                            <button onClick={() => setEditingId(null)} className="bg-gray-400 text-white px-3 py-1 rounded text-xs">Cancelar</button>
+                        </div>
+                        </div>
+                    ) : (
+                        <div 
+                        className="cursor-pointer hover:bg-blue-50 transition-colors p-2 rounded border border-dashed border-transparent hover:border-blue-200"
+                        onClick={() => { setEditingId(uniqueId); setTempDescription(measure.description || ''); }}
+                        >
+                        {measure.description ? (
+                            <p className="text-sm text-blue-900">{measure.description}</p>
+                        ) : (
+                            <p className="text-xs text-gray-400 italic font-mono">+ Adicionar documentação (TMDL ///)</p>
+                        )}
+                        </div>
+                    )}
+                    </div>
 
                 {/* BODY */}
                 <div className="p-5">
