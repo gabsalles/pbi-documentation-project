@@ -24,16 +24,34 @@ const FileUpload: React.FC<FileUploadProps> = ({ onUpload, loading }) => {
     e.preventDefault();
     e.stopPropagation();
     setDragActive(false);
-    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-      // Note: Drag and drop folders is restricted in some browsers without webkitGetAsEntry
-      // We recommend using the button for folders
-      alert("Para melhor compatibilidade com estruturas de pasta complexas, por favor utilize o botão 'Selecionar Pasta PBIP'.");
-    }
+    alert("Para garantir os caminhos de edição, por favor utilize o botão 'Selecionar Pasta PBIP'.");
   };
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files.length > 0) {
-      onUpload(e.target.files);
+  // --- A MÁGICA ACONTECE AQUI ---
+  const handleElectronSelect = async () => {
+    try {
+       const electron = (window as any).require('electron');
+       const fs = (window as any).require('fs');
+
+       // Chama a caixa de seleção nativa do Windows/Mac
+       const filesData = await electron.ipcRenderer.invoke('select-pbip-folder');
+       
+       if (filesData && filesData.length > 0) {
+          // Monta objetos que simulam os ficheiros do navegador, mas COM o caminho real
+          const customFiles = filesData.map((f: any) => ({
+              name: f.name,
+              path: f.path,
+              webkitRelativePath: f.webkitRelativePath,
+              // Usa o Node.js para ler o texto do ficheiro
+              text: async () => fs.promises.readFile(f.path, 'utf-8')
+          }));
+          
+          // Envia para o pbipParser
+          onUpload(customFiles as any);
+       }
+    } catch (error) {
+       console.error("Erro ao abrir janela nativa", error);
+       alert("Erro ao tentar abrir o selecionador de pastas.");
     }
   };
 
@@ -67,31 +85,20 @@ const FileUpload: React.FC<FileUploadProps> = ({ onUpload, loading }) => {
                  <Upload size={32} className="text-brand-primary" />
               </div>
               <p className="text-lg font-semibold text-brand-dark mb-2">
-                Arraste ou clique para carregar
+                Clique para carregar o projeto
               </p>
               <p className="text-sm text-gray-400 mb-6">
                 Selecione a pasta raiz contendo o arquivo .pbip
               </p>
               
               <button
-                onClick={() => inputRef.current?.click()}
+                onClick={handleElectronSelect}
                 className="bg-brand-primary hover:bg-brand-secondary text-white font-medium py-3 px-8 rounded-full shadow-lg transition-transform transform hover:scale-105"
               >
                 Selecionar Pasta PBIP
               </button>
             </div>
           )}
-
-          <input
-            ref={inputRef}
-            type="file"
-            className="hidden"
-            onChange={handleChange}
-            // @ts-ignore
-            webkitdirectory="" 
-            directory="" 
-            multiple
-          />
         </div>
         
         <div className="mt-8 grid grid-cols-3 gap-4 text-left">

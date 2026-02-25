@@ -123,15 +123,18 @@ export const parsePBIPData = async (files: FileList): Promise<PBIModel> => {
   // 1. If model.bim exists, it is the source of truth (JSON format)
   // 2. Else, use TMDL files
 
-  if (modelBimFile) {
-      const text = await modelBimFile.text();
-      try {
-          parseModelBim(text, model);
-      } catch (e) {
-          console.error("Error parsing model.bim", e);
-      }
-  } else {
-      // TMDL Parsing
+  // --- PARSING STRATEGY ---
+  // 1. Prioridade máxima para o formato TMDL (pois suporta edição)
+  // 2. Fallback para model.bim (Apenas leitura)
+
+  // ADICIONE ESTE CONSOLE.LOG PARA GARANTIA:
+  if (tableFiles.length > 0) {
+  console.log("TESTE DE CAMINHO DO ARQUIVO:", tableFiles[0].name, (tableFiles[0] as any).path);
+  }
+
+  // NOVA LÓGICA DE PRIORIDADE:
+  if (tableFiles.length > 0 || modelTmdlFile) {
+      // TMDL Parsing (PRIORIDADE)
       if (tableFiles.length > 0) {
         const pathParts = tableFiles[0].webkitRelativePath.split('/');
         const datasetFolder = pathParts.find(p => p.endsWith('.Dataset') || p.endsWith('.SemanticModel'));
@@ -142,21 +145,20 @@ export const parsePBIPData = async (files: FileList): Promise<PBIModel> => {
 
       for (const file of tableFiles) {
         const text = await file.text();
-        if (text.includes('table ')) { // Loose check first
-            const table = parseTmdlTableContent(text, (file as any).path); // O (file as any).path pega o caminho real no Electron
+        if (text.includes('table ')) { 
+            const table = parseTmdlTableContent(text, (file as any).path); 
             if (table) model.tables.push(table);
         }
       }
 
       if (expressionsFile) {
         const text = await expressionsFile.text();
-        // Passe o path como segundo argumento
         const { parameters, sharedTables } = parseExpressionsTmdl(text, (expressionsFile as any).path); 
         model.parameters.push(...parameters);
         if (sharedTables.length > 0) {
-        model.tables.push(...sharedTables);
+           model.tables.push(...sharedTables);
         }
-    }
+      }
 
       if (relationshipsFile) {
         const text = await relationshipsFile.text();
@@ -166,6 +168,16 @@ export const parsePBIPData = async (files: FileList): Promise<PBIModel> => {
       if (modelTmdlFile) {
           const text = await modelTmdlFile.text();
           model.roles = parseRolesTmdl(text);
+      }
+
+  } else if (modelBimFile) {
+      // BIM Parsing (PLANO B)
+      console.log("Aviso: Lendo arquivo .bim. A edição não será suportada.");
+      const text = await modelBimFile.text();
+      try {
+          parseModelBim(text, model);
+      } catch (e) {
+          console.error("Error parsing model.bim", e);
       }
   }
 

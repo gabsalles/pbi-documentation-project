@@ -27,6 +27,8 @@ const [editingId, setEditingId] = useState<string | null>(null);
 const [tempDescription, setTempDescription] = useState('');
 
 const handleSave = async (measure: PBIMeasure) => {
+  // ADICIONE ESTA LINHA:
+  console.log("DADOS DA MEDIDA:", measure);
   if (!measure.sourceFilePath) return alert("Caminho do arquivo não encontrado!");
 
   // Chama a ponte do Electron
@@ -38,11 +40,12 @@ const handleSave = async (measure: PBIMeasure) => {
   });
 
   if (result.success) {
-    measure.description = tempDescription; // Atualiza na memória local
+    measure.description = tempDescription; 
     setEditingId(null);
-    alert("Salvo com sucesso!");
+    // Removemos o alert() para evitar o bug de foco do Electron
   } else {
-    alert("Erro: " + result.error);
+    // O alerta de erro pode ficar, pois só aparece se algo der errado
+    alert("Erro ao salvar: " + result.error);
   }
 };
 
