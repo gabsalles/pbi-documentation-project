@@ -6,34 +6,37 @@ interface TablesViewProps {
   tables: PBITable[];
 }
 
-// 1. Adicione estes estados no topo do componente
-const [editingColId, setEditingColId] = useState<string | null>(null);
-const [tempColDesc, setTempColDesc] = useState('');
-
-// 2. Adicione a função de salvar (similar à das medidas)
-const handleSaveColumn = async (table: PBITable, colName: string) => {
-  if (!table.sourceFilePath) return alert("Caminho do arquivo não encontrado!");
-
-  const result = await (window as any).require('electron').ipcRenderer.invoke('save-description', {
-    filePath: table.sourceFilePath,
-    itemName: colName,
-    newDescription: tempColDesc,
-    type: 'column'
-  });
-
-  if (result.success) {
-    const col = table.columns.find(c => c.name === colName);
-    if (col) col.description = tempColDesc;
-    setEditingColId(null);
-    alert("Coluna atualizada!");
-  } else {
-    alert("Erro: " + result.error);
-  }
-};
-
+// O COMPONENTE COMEÇA AQUI
 const TablesView: React.FC<TablesViewProps> = ({ tables }) => {
+  
+  // 1. TODOS OS USESTATES DEVEM FICAR AQUI DENTRO! (Logo abaixo da declaração da função)
   const [expandedTable, setExpandedTable] = useState<string | null>(null);
   const [usageFilter, setUsageFilter] = useState<'all' | 'used' | 'unused'>('all');
+  
+  // Cole os estados de edição das colunas aqui dentro:
+  const [editingColId, setEditingColId] = useState<string | null>(null);
+  const [tempColDesc, setTempColDesc] = useState('');
+
+  // 2. A FUNÇÃO DE SALVAR TAMBÉM DEVE FICAR AQUI DENTRO:
+  const handleSaveColumn = async (table: PBITable, colName: string) => {
+    if (!table.sourceFilePath) return alert("Caminho do arquivo não encontrado!");
+
+    const result = await (window as any).require('electron').ipcRenderer.invoke('save-description', {
+      filePath: table.sourceFilePath,
+      itemName: colName,
+      newDescription: tempColDesc,
+      type: 'column'
+    });
+
+    if (result.success) {
+      const col = table.columns.find(c => c.name === colName);
+      if (col) col.description = tempColDesc;
+      setEditingColId(null);
+      alert("Coluna atualizada!");
+    } else {
+      alert("Erro: " + result.error);
+    }
+  };
 
   const toggleTable = (name: string) => {
     setExpandedTable(expandedTable === name ? null : name);
