@@ -21,6 +21,7 @@ export interface PBIColumn {
   sourceColumn?: string;
   summarizeBy?: string;
   expression?: string; // For Calculated Columns
+  SourceFilePath?: string; // Adicione isto
 }
 
 export interface PBIParameter {

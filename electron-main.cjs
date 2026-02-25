@@ -27,40 +27,29 @@ app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit();
 });
 
-// Handler de salvamento atualizado com suporte a identação
+// Cole o handler de salvamento no final do ficheiro
 ipcMain.handle('save-description', async (event, { filePath, itemName, newDescription, type }) => {
   try {
     let content = fs.readFileSync(filePath, 'utf-8');
     const lines = content.split(/\r?\n/);
-
     const marker = type === 'measure' ? `measure ${itemName}` : `column ${itemName}`;
     const index = lines.findIndex(line => line.includes(marker));
 
     if (index !== -1) {
-      // Captura a identação da linha atual (espaços ou tabs no início)
       const match = lines[index].match(/^(\s*)/);
       const indent = match ? match[1] : '';
-
-      // 1. Remove descrições antigas (linhas com /// acima do item)
       let i = index - 1;
       while (i >= 0 && lines[i].trim().startsWith('///')) {
         lines.splice(i, 1);
         i--;
       }
-
-      // 2. Insere a nova descrição respeitando a identação da medida/coluna
       const newIndex = i + 1;
-      const formattedDesc = newDescription
-        .split('\n')
-        .map(d => `${indent}/// ${d}`) // Aplica a mesma identação em cada linha da descrição
-        .join('\n');
-      
+      const formattedDesc = newDescription.split('\n').map(d => `${indent}/// ${d}`).join('\n');
       lines.splice(newIndex, 0, formattedDesc);
-
       fs.writeFileSync(filePath, lines.join('\n'), 'utf-8');
       return { success: true };
     }
-    return { success: false, error: 'Item não encontrado no arquivo.' };
+    return { success: false, error: 'Item não encontrado' };
   } catch (err) {
     return { success: false, error: err.message };
   }
