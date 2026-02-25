@@ -1,23 +1,22 @@
-const { app, BrowserWindow, ipcMain } = require('electron'); // Adicione ipcMain
-const fs = require('fs'); // Adicione fs para ler/escrever arquivos
+const { app, BrowserWindow, ipcMain } = require('electron');
+const path = require('path'); // ESSENCIAL: Não pode faltar!
+const fs = require('fs');
 
 function createWindow () {
   const win = new BrowserWindow({
     width: 1280,
     height: 800,
-    icon: path.join(__dirname, 'build', 'icon.ico'), // Descomente quando tiver o ícone pronto!
-    autoHideMenuBar: true, // Esconde aquela barra "Arquivo, Editar, Exibir"
+    icon: path.join(__dirname, 'build', 'icon.ico'),
+    autoHideMenuBar: true,
     webPreferences: {
       nodeIntegration: true,
       contextIsolation: false
     }
   });
 
-  // Se estivermos em desenvolvimento, carrega o Vite local
   if (process.env.NODE_ENV === 'development') {
     win.loadURL('http://localhost:3000');
   } else {
-    // Se for o .exe final, carrega a pasta dist/ que o Vite gerou
     win.loadFile(path.join(__dirname, 'dist/index.html'));
   }
 }
@@ -25,23 +24,23 @@ function createWindow () {
 app.whenReady().then(createWindow);
 
 app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin') {
-    app.quit();
-  }
+  if (process.platform !== 'darwin') app.quit();
 });
 
-// No final do arquivo, adicione o "Ouvidor" de salvamento:
+// Handler de salvamento atualizado com suporte a identação
 ipcMain.handle('save-description', async (event, { filePath, itemName, newDescription, type }) => {
   try {
     let content = fs.readFileSync(filePath, 'utf-8');
     const lines = content.split(/\r?\n/);
 
-    // Lógica para achar a linha da medida ou coluna
-    // Ex: measure 'Nome da Medida' ou column 'Nome da Coluna'
     const marker = type === 'measure' ? `measure ${itemName}` : `column ${itemName}`;
     const index = lines.findIndex(line => line.includes(marker));
 
     if (index !== -1) {
+      // Captura a identação da linha atual (espaços ou tabs no início)
+      const match = lines[index].match(/^(\s*)/);
+      const indent = match ? match[1] : '';
+
       // 1. Remove descrições antigas (linhas com /// acima do item)
       let i = index - 1;
       while (i >= 0 && lines[i].trim().startsWith('///')) {
@@ -49,9 +48,13 @@ ipcMain.handle('save-description', async (event, { filePath, itemName, newDescri
         i--;
       }
 
-      // 2. Insere a nova descrição (ajusta o índice porque deletamos linhas)
+      // 2. Insere a nova descrição respeitando a identação da medida/coluna
       const newIndex = i + 1;
-      const formattedDesc = `/// ${newDescription.replace(/\n/g, '\n/// ')}`;
+      const formattedDesc = newDescription
+        .split('\n')
+        .map(d => `${indent}/// ${d}`) // Aplica a mesma identação em cada linha da descrição
+        .join('\n');
+      
       lines.splice(newIndex, 0, formattedDesc);
 
       fs.writeFileSync(filePath, lines.join('\n'), 'utf-8');

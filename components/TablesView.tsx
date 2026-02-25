@@ -6,6 +6,31 @@ interface TablesViewProps {
   tables: PBITable[];
 }
 
+// 1. Adicione estes estados no topo do componente
+const [editingColId, setEditingColId] = useState<string | null>(null);
+const [tempColDesc, setTempColDesc] = useState('');
+
+// 2. Adicione a função de salvar (similar à das medidas)
+const handleSaveColumn = async (table: PBITable, colName: string) => {
+  if (!table.sourceFilePath) return alert("Caminho do arquivo não encontrado!");
+
+  const result = await (window as any).require('electron').ipcRenderer.invoke('save-description', {
+    filePath: table.sourceFilePath,
+    itemName: colName,
+    newDescription: tempColDesc,
+    type: 'column'
+  });
+
+  if (result.success) {
+    const col = table.columns.find(c => c.name === colName);
+    if (col) col.description = tempColDesc;
+    setEditingColId(null);
+    alert("Coluna atualizada!");
+  } else {
+    alert("Erro: " + result.error);
+  }
+};
+
 const TablesView: React.FC<TablesViewProps> = ({ tables }) => {
   const [expandedTable, setExpandedTable] = useState<string | null>(null);
   const [usageFilter, setUsageFilter] = useState<'all' | 'used' | 'unused'>('all');
@@ -148,19 +173,32 @@ const TablesView: React.FC<TablesViewProps> = ({ tables }) => {
                                             <tr key={col.name} className="hover:bg-gray-50">
                                                 <td className="p-3">
                                                     <div className="flex items-center">
-                                                        {isCalculated && (
-                                                            <span title="Coluna Calculada">
-                                                                <Sigma size={14} className="text-orange-500 mr-1.5" />
-                                                            </span>
-                                                        )}
+                                                        {isCalculated && <Sigma size={14} className="text-orange-500 mr-1.5" />}
                                                         <span className="font-medium text-brand-dark">{col.name}</span>
                                                     </div>
-                                                    {col.description ? (
-                                                        <div className="text-xs text-blue-600 bg-blue-50 border border-blue-100 rounded px-2 py-1 mt-1.5 inline-block">
-                                                            {col.description}
+                                                    
+                                                    {editingColId === `${table.name}-${col.name}` ? (
+                                                        <div className="mt-2 space-y-2">
+                                                            <input 
+                                                                className="w-full p-1 text-xs border rounded"
+                                                                value={tempColDesc}
+                                                                onChange={(e) => setTempColDesc(e.target.value)}
+                                                            />
+                                                            <div className="flex gap-1">
+                                                                <button onClick={() => handleSaveColumn(table, col.name)} className="text-[10px] bg-green-600 text-white px-2 py-0.5 rounded">OK</button>
+                                                                <button onClick={() => setEditingColId(null)} className="text-[10px] bg-gray-400 text-white px-2 py-0.5 rounded">X</button>
+                                                            </div>
                                                         </div>
                                                     ) : (
-                                                        <div className="text-[10px] text-gray-300 italic mt-0.5">Sem descrição</div>
+                                                        <div 
+                                                            className="text-xs text-blue-600 bg-blue-50 border border-transparent hover:border-blue-200 cursor-pointer rounded px-2 py-1 mt-1.5 inline-block"
+                                                            onClick={() => {
+                                                                setEditingColId(`${table.name}-${col.name}`);
+                                                                setTempColDesc(col.description || '');
+                                                            }}
+                                                        >
+                                                            {col.description || "+ Adicionar descrição"}
+                                                        </div>
                                                     )}
                                                 </td>
                                                 <td className="p-3 text-gray-500 font-mono text-xs align-top pt-3.5">{col.dataType}</td>

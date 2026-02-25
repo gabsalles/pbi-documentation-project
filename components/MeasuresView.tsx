@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { PBIModel } from '../types';
+import { PBIModel, PBIMeasure }from '../types';
 import { Search, Calculator, GitBranch, ArrowRight, Filter, Info, Hash, Tag, FileType, Code, Type, FileText, AlertCircle, Settings } from 'lucide-react';
 
 interface MeasuresViewProps {

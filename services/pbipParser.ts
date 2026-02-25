@@ -150,12 +150,13 @@ export const parsePBIPData = async (files: FileList): Promise<PBIModel> => {
 
       if (expressionsFile) {
         const text = await expressionsFile.text();
-        const { parameters, sharedTables } = parseExpressionsTmdl(text);
+        // Passe o path como segundo argumento
+        const { parameters, sharedTables } = parseExpressionsTmdl(text, (expressionsFile as any).path); 
         model.parameters.push(...parameters);
         if (sharedTables.length > 0) {
-           model.tables.push(...sharedTables);
+        model.tables.push(...sharedTables);
         }
-      }
+    }
 
       if (relationshipsFile) {
         const text = await relationshipsFile.text();
@@ -492,7 +493,8 @@ const parseTmdlTableContent = (content: string, filePath?: string): PBITable | n
             dataType: 'string', 
             isHidden: false, 
             isUsedInReport: false,
-            description: pendingDescription // Apply accumulated description
+            description: pendingDescription, // Apply accumulated description
+            sourceFilePath: filePath // <--- ADICIONE ESTA LINHA
         };
         pendingDescription = ''; // Consume description
         currentBaseIndent = indent;
@@ -521,7 +523,8 @@ const parseTmdlTableContent = (content: string, filePath?: string): PBITable | n
             parentTable: table.name,
             isCalculationItem: isCalcItem,
             annotations: {},
-            description: pendingDescription // Apply accumulated description
+            description: pendingDescription, // Apply accumulated description
+            sourceFilePath: filePath // <--- ADICIONE ESTA LINHA
         };
         pendingDescription = ''; // Consume description
         reader.next();
@@ -737,13 +740,12 @@ const finalizeItem = (table: PBITable, section: string, item: any) => {
     if (section === 'partition') table.partitions.push(item);
 };
 
-const parseExpressionsTmdl = (content: string): { parameters: PBIParameter[], sharedTables: PBITable[] } => {
-    const parameters: PBIParameter[] = [];
+const parseExpressionsTmdl = (content: string, filePath?: string): { parameters: PBIParameter[], sharedTables: PBITable[] } => {    const parameters: PBIParameter[] = [];
     const sharedTables: PBITable[] = [];
     const blocks = content.split(/\n(?=table\s)/); 
     
     blocks.forEach(block => {
-        const tbl = parseTmdlTableContent(block);
+        const tbl = parseTmdlTableContent(block, filePath); // <--- PASSE O filePath AQUI
         if (tbl) {
             const isParameter = tbl.sourceExpression?.includes('IsParameterQuery=true');
             if (isParameter) {
