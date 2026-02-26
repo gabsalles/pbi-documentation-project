@@ -113,3 +113,55 @@ ipcMain.handle('select-pbip-folder', async (event) => {
     return null;
   }
 });
+
+// --- ORGANIZADOR EM LOTE (PASTAS) ---
+ipcMain.handle('bulk-update-folders', async (event, { updates }) => {
+  let successCount = 0;
+  let errors = [];
+
+  for (const update of updates) {
+    try {
+      let content = fs.readFileSync(update.filePath, 'utf-8');
+      let lines = content.split(/\r?\n/);
+
+      const index = lines.findIndex(line => {
+        const t = line.trim();
+        return t.startsWith(`measure '${update.itemName}'`) || 
+               t.startsWith(`measure "${update.itemName}"`) || 
+               t.startsWith(`measure ${update.itemName}`);
+      });
+
+      if (index !== -1) {
+        const match = lines[index].match(/^(\s*)/);
+        const indent = match ? match[1] : '';
+        const propertyIndent = indent + '\t'; // Recuo padrão para propriedades
+
+        // Tenta achar um displayFolder já existente nas próximas linhas para substituir
+        let i = index + 1;
+        let foundOldFolder = false;
+        
+        while (i < lines.length && (lines[i].trim() === '' || lines[i].match(/^\s+/) || lines[i].trim().startsWith('///'))) {
+            if (lines[i].trim().startsWith('displayFolder')) {
+                lines[i] = `${propertyIndent}displayFolder: ${update.newFolder}`; // Atualiza o existente
+                foundOldFolder = true;
+                break;
+            }
+            i++;
+        }
+
+        // Se não tinha pasta antes, cria uma linha nova logo abaixo da medida
+        if (!foundOldFolder) {
+            lines.splice(index + 1, 0, `${propertyIndent}displayFolder: ${update.newFolder}`);
+        }
+
+        fs.writeFileSync(update.filePath, lines.join('\n'), 'utf-8');
+        successCount++;
+      } else {
+        errors.push(`Não achei: ${update.itemName}`);
+      }
+    } catch (e) {
+      errors.push(`Erro ${update.itemName}: ${e.message}`);
+    }
+  }
+  return { success: true, successCount, errors };
+});

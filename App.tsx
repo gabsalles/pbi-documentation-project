@@ -9,6 +9,7 @@ import MeasuresView from './components/MeasuresView';
 import RelationshipsView from './components/RelationshipsView';
 import ReportView from './components/ReportView';
 import SecurityView from './components/SecurityView';
+import BulkEditorView from './components/BulkEditorView';
 
 const App: React.FC = () => {
   const [model, setModel] = useState<PBIModel | null>(null);
@@ -51,6 +52,8 @@ const App: React.FC = () => {
       case 'relationships': return <RelationshipsView model={model} />;
       case 'security': return <SecurityView model={model} />;
       case 'report': return <ReportView model={model} onUpdatePage={handlePageUpdate} />;
+      // --- BASTA ADICIONAR ESTA LINHA: ---
+      case 'bulk': return <BulkEditorView model={model} />;
       default: return <Dashboard model={model} />;
     }
   };

@@ -29,6 +29,8 @@ const Layout: React.FC<LayoutProps> = ({ currentView, onChangeView, children, mo
     { id: 'relationships', label: 'Relacionamentos', icon: GitMerge },
     { id: 'security', label: 'Segurança (RLS)', icon: Shield },
     { id: 'report', label: 'Relatório', icon: FileText },
+    // Adicione isto no array navItems (linha ~24)
+    { id: 'bulk', label: 'Organizar Pastas', icon: Database }, // Pode usar qualquer ícone que já esteja importado
   ];
 
   const handlePrint = () => {
