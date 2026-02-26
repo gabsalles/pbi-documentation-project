@@ -1,243 +1,265 @@
-import React, { useState } from 'react';
-import { PBIModel, PBITable } from '../types';
-import { ChevronDown, ChevronRight, Table, Code, EyeOff, Settings, Filter, FunctionSquare, Calculator, Layers, FileType, FileText, Sigma } from 'lucide-react';
+import React, { useState, useMemo } from 'react';
+import ImpactAnalyzer from './ImpactAnalyzer';
+import { PBIModel, PBITable, PBIColumn } from '../types';
+import { 
+  ChevronDown, ChevronRight, Table, Code, EyeOff, Settings, 
+  Filter, FunctionSquare, Calculator, Layers, FileType, 
+  FileText, Sigma, Search, CheckCircle, AlertTriangle,
+  ChevronUp, Type, GitBranch, Hash
+} from 'lucide-react';
+
+// --- COMPONENTE DE HIGHLIGHT PARA COLUNAS CALCULADAS ---
+const DAXCodeBlock = ({ code }: { code: string }) => {
+  const [isExpanded, setIsExpanded] = useState(false);
+  const highlightedCode = useMemo(() => {
+    if (!code) return '';
+    const escaped = code.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    const regex = /(\/\*[\s\S]*?\*\/|\/\/.*|--.*)|("[^"]*")|('[^']+'|\[[^\]]+\])|(\b(?:VAR|RETURN|CALCULATE|SUM|SUMX|AVERAGE|MIN|MAX|COUNTROWS|DISTINCTCOUNT|DIVIDE|FILTER|ALL|VALUES|SELECTEDVALUE|IF|SWITCH|RELATED|LOOKUPVALUE|HASONEVALUE|ALLSELECTED|KEEPFILTERS|DATEADD|DATESYTD|SAMEPERIODLASTYEAR)\b)|(\b\d+(?:\.\d+)?\b)/gi;
+    return escaped.replace(regex, (match, comment, string, ref, keyword, number) => {
+      if (comment) return `<span class="text-gray-500 italic">${match}</span>`;
+      if (string)  return `<span class="text-emerald-400">${match}</span>`;
+      if (ref)     return `<span class="text-pink-400 font-medium">${match}</span>`;
+      if (keyword) return `<span class="text-sky-400 font-bold">${match}</span>`;
+      if (number)  return `<span class="text-amber-300">${match}</span>`;
+      return match;
+    });
+  }, [code]);
+
+  const needsExpansion = code.split('\n').length > 6;
+
+  return (
+    <div className="relative mt-2">
+      <div className={`bg-[#1E1E1E] rounded-xl p-4 overflow-hidden border border-gray-800 transition-all duration-500 ${!isExpanded && needsExpansion ? 'max-h-[150px]' : 'max-h-[2000px]'}`}>
+        <pre className="font-mono text-[12px] leading-relaxed"><code className="text-gray-300" dangerouslySetInnerHTML={{ __html: highlightedCode }} /></pre>
+        {!isExpanded && needsExpansion && <div className="absolute bottom-0 left-0 right-0 h-12 bg-gradient-to-t from-[#1E1E1E] to-transparent pointer-events-none" />}
+      </div>
+      {needsExpansion && (
+        <button onClick={() => setIsExpanded(!isExpanded)} className="mt-2 text-[9px] font-black text-brand-primary uppercase tracking-tighter flex items-center gap-1 mx-auto bg-white px-3 py-1 rounded-full border shadow-sm">
+          {isExpanded ? <><ChevronUp size={12}/> Recolher</> : <><ChevronDown size={12}/> Ver DAX Completo</>}
+        </button>
+      )}
+    </div>
+  );
+};
 
 interface TablesViewProps {
   tables: PBITable[];
 }
 
-// O COMPONENTE COMEÇA AQUI
 const TablesView: React.FC<TablesViewProps> = ({ tables }) => {
-  
-  // 1. TODOS OS USESTATES DEVEM FICAR AQUI DENTRO! (Logo abaixo da declaração da função)
   const [expandedTable, setExpandedTable] = useState<string | null>(null);
-  const [usageFilter, setUsageFilter] = useState<'all' | 'used' | 'unused'>('all');
-  
-  // Cole os estados de edição das colunas aqui dentro:
+  const [expandedCol, setExpandedCol] = useState<string | null>(null); // Novo: Expansão de detalhes da coluna
+  const [usageFilter, setUsageFilter] = useState<'all' | 'used' | 'unused' | 'safe' | 'atRisk'>('all');
   const [editingColId, setEditingColId] = useState<string | null>(null);
   const [tempColDesc, setTempColDesc] = useState('');
 
-  // 2. A FUNÇÃO DE SALVAR TAMBÉM DEVE FICAR AQUI DENTRO:
   const handleSaveColumn = async (table: PBITable, colName: string) => {
     if (!table.sourceFilePath) return alert("Caminho do arquivo não encontrado!");
-
     const result = await (window as any).require('electron').ipcRenderer.invoke('save-description', {
-      filePath: table.sourceFilePath,
-      itemName: colName,
-      newDescription: tempColDesc,
-      type: 'column'
+      filePath: table.sourceFilePath, itemName: colName, newDescription: tempColDesc, type: 'column'
     });
-
     if (result.success) {
       const col = table.columns.find(c => c.name === colName);
       if (col) col.description = tempColDesc;
       setEditingColId(null);
-      alert("Coluna atualizada!");
     } else {
       alert("Erro: " + result.error);
     }
   };
 
-  const toggleTable = (name: string) => {
-    setExpandedTable(expandedTable === name ? null : name);
-  };
-
   const isTableUsed = (table: PBITable) => {
-      const hasUsedColumn = table.columns.some(c => c.isUsedInReport);
-      const hasUsedMeasure = table.measures.some(m => m.isUsedInReport);
-      return hasUsedColumn || hasUsedMeasure;
+      return table.columns.some(c => c.isUsedInReport) || table.measures.some(m => m.isUsedInReport);
   };
 
   const filteredTables = tables.filter(table => {
-      if (usageFilter === 'all') return true;
       const used = isTableUsed(table);
-      return usageFilter === 'used' ? used : !used;
+      const isSafe = table.columns.every(c => !c.isUsedInReport && (!c.dependents || c.dependents.length === 0)) && 
+                     table.measures.every(m => !m.isUsedInReport && (!m.dependents || m.dependents.length === 0));
+      
+      if (usageFilter === 'all') return true;
+      if (usageFilter === 'used') return used;
+      if (usageFilter === 'unused') return !used;
+      if (usageFilter === 'safe') return isSafe;
+      if (usageFilter === 'atRisk') return used || !isSafe;
+      return true;
   });
 
   const getTableIcon = (table: PBITable) => {
       if (table.isCalculationGroup) return <FileType size={20} className="text-purple-500" />;
       if (table.isParameter) return <Settings size={20} className="text-blue-500" />;
       if (table.isUDF) return <FunctionSquare size={20} className="text-orange-500" />;
-      if (table.columns.length === 0 && table.measures.length > 0) return <Calculator size={20} className="text-green-500" />;
-      if (table.columns.length === 0) return <Layers size={20} className="text-gray-400" />;
       return <Table size={20} className="text-brand-primary" />;
   };
 
-  const getTableTypeLabel = (table: PBITable) => {
-      if (table.isCalculationGroup) return <span className="bg-purple-100 text-purple-800 text-[10px] font-bold px-2 py-0.5 rounded uppercase">Calculation Group</span>;
-      if (table.isParameter) return <span className="bg-blue-100 text-blue-800 text-[10px] font-bold px-2 py-0.5 rounded uppercase">Field Parameter</span>;
-      if (table.isUDF) return <span className="bg-orange-100 text-orange-800 text-[10px] font-bold px-2 py-0.5 rounded uppercase">Power Query Function</span>;
-      return <span className="bg-gray-100 text-gray-600 text-[10px] font-bold px-2 py-0.5 rounded uppercase">{table.type}</span>;
-  };
-
   return (
-    <div className="p-6 space-y-6">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <h2 className="text-2xl font-bold text-brand-dark">Dicionário de Tabelas</h2>
-        
-        <div className="flex items-center space-x-2 bg-white p-1 rounded-lg border border-gray-200 shadow-sm">
+    <div className="p-6 space-y-6 bg-gray-50 min-h-screen">
+      
+      {/* HEADER E FILTROS REDESENHADOS */}
+      <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-6">
+        <div>
+          <h2 className="text-2xl font-bold text-gray-800 tracking-tight">Dicionário de Tabelas</h2>
+          <p className="text-sm text-gray-500 mt-1">Gerencie a linhagem de {filteredTables.length} objetos.</p>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-4">
+          <div className="flex p-1 bg-gray-100 rounded-xl border border-gray-200 shadow-inner">
+            {['all', 'used', 'unused'].map((id) => (
+              <button
+                key={id}
+                onClick={() => setUsageFilter(id as any)}
+                className={`px-4 py-1.5 text-xs font-bold rounded-lg transition-all ${usageFilter === id ? 'bg-white text-gray-800 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+              >
+                {id === 'all' ? 'Todas' : id === 'used' ? 'Em Uso' : 'Inativas'}
+              </button>
+            ))}
+          </div>
+          
+          <div className="flex items-center gap-2">
             <button 
-                onClick={() => setUsageFilter('all')}
-                className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${usageFilter === 'all' ? 'bg-brand-gray text-brand-dark' : 'text-gray-500 hover:bg-gray-50'}`}
+              onClick={() => setUsageFilter('safe')}
+              className={`flex items-center gap-2 px-4 py-2 text-xs font-black rounded-xl border-2 transition-all ${usageFilter === 'safe' ? 'bg-emerald-600 border-emerald-600 text-white shadow-lg shadow-emerald-100' : 'bg-white border-emerald-100 text-emerald-600'}`}
             >
-                Todas
+              <CheckCircle size={14} /> LIMPEZA SEGURA
             </button>
             <button 
-                onClick={() => setUsageFilter('used')}
-                className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${usageFilter === 'used' ? 'bg-green-50 text-green-700 border border-green-200' : 'text-gray-500 hover:bg-gray-50'}`}
+              onClick={() => setUsageFilter('atRisk')}
+              className={`flex items-center gap-2 px-4 py-2 text-xs font-black rounded-xl border-2 transition-all ${usageFilter === 'atRisk' ? 'bg-rose-600 border-rose-600 text-white shadow-lg shadow-rose-100' : 'bg-white border-rose-100 text-rose-600'}`}
             >
-                Em Uso
+              <AlertTriangle size={14} /> ALTO IMPACTO
             </button>
-            <button 
-                onClick={() => setUsageFilter('unused')}
-                className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${usageFilter === 'unused' ? 'bg-blue-50 text-red-700 border border-red-200' : 'text-gray-500 hover:bg-gray-50'}`}
-            >
-                Não Utilizadas
-            </button>
+          </div>
         </div>
       </div>
       
+      {/* LISTA DE TABELAS */}
       <div className="space-y-4">
-        {filteredTables.length > 0 ? (
-            filteredTables.map(table => (
-                <div key={table.name} className="bg-white rounded-xl shadow-sm overflow-hidden border border-gray-100 print-break-before">
-                {/* Header */}
+        {filteredTables.map(table => (
+            <div key={table.name} className="bg-white rounded-2xl shadow-sm overflow-hidden border border-gray-200 transition-all hover:shadow-md">
                 <div 
-                    className="p-4 bg-white flex items-center justify-between cursor-pointer hover:bg-gray-50 transition-colors"
-                    onClick={() => toggleTable(table.name)}
+                    className="p-5 bg-white flex items-center justify-between cursor-pointer group"
+                    onClick={() => setExpandedTable(expandedTable === table.name ? null : table.name)}
                 >
-                    <div className="flex items-center space-x-3">
-                    {expandedTable === table.name ? <ChevronDown size={20} className="text-brand-primary"/> : <ChevronRight size={20} className="text-gray-400"/>}
-                    <div className={`p-2 rounded-lg bg-gray-50 border border-gray-100`}>
-                        {getTableIcon(table)}
+                    <div className="flex items-center space-x-4">
+                        <div className={`transition-transform duration-300 ${expandedTable === table.name ? 'rotate-90 text-brand-primary' : 'text-gray-300'}`}>
+                            <ChevronRight size={24} />
+                        </div>
+                        <div className="p-3 rounded-xl bg-gray-50 border border-gray-100 group-hover:scale-110 transition-transform">
+                            {getTableIcon(table)}
+                        </div>
+                        <div>
+                            <h3 className="font-bold text-xl text-gray-800 flex items-center gap-2">
+                                {table.name}
+                                <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-gray-100 text-gray-500 uppercase">{table.type}</span>
+                            </h3>
+                            <p className="text-xs text-gray-400 font-medium mt-0.5">{table.columns.length} Colunas • {table.measures.length} Medidas</p>
+                        </div>
                     </div>
-                    <div>
-                        <h3 className="font-bold text-lg text-brand-dark flex items-center gap-2">
-                            {table.name}
-                            {getTableTypeLabel(table)}
-                        </h3>
-                        <p className="text-xs text-gray-500 mt-1">
-                        {table.columns.length} Colunas • {table.measures.length} Medidas
-                        </p>
-                    </div>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                        {isTableUsed(table) ? (
-                            <span className="bg-green-100 text-green-800 text-xs px-2 py-1 rounded font-medium">Em Uso</span>
-                        ) : (
-                            <span className="bg-gray-100 text-gray-500 text-xs px-2 py-1 rounded font-medium">Não Usada</span>
-                        )}
-                    </div>
+                    {isTableUsed(table) ? (
+                        <span className="bg-emerald-100 text-emerald-700 text-[10px] px-3 py-1 rounded-full font-black uppercase border border-emerald-200">Em Uso</span>
+                    ) : (
+                        <span className="bg-gray-100 text-gray-400 text-[10px] px-3 py-1 rounded-full font-black uppercase border border-gray-200">Não Usada</span>
+                    )}
                 </div>
 
-                {/* Content */}
                 {expandedTable === table.name && (
-                    <div className="p-4 border-t border-gray-100 bg-gray-50">
-                    {table.description && (
-                         <div className="mb-4 bg-yellow-50 p-3 rounded-lg border border-yellow-100 flex items-start">
-                             <FileText size={16} className="text-yellow-600 mr-2 mt-0.5" />
-                             <span className="text-sm text-yellow-800 italic">{table.description}</span>
-                         </div>
-                    )}
-
-                    {table.sourceExpression && (
-                        <div className="mb-6">
-                            <h4 className="text-sm font-bold uppercase text-gray-500 mb-2 flex items-center">
-                                <Code size={14} className="mr-2"/> Fonte (Power Query / M)
-                            </h4>
-                            <div className="bg-brand-dark text-gray-300 p-4 rounded-lg text-xs overflow-x-auto shadow-inner">
-                                <pre className="font-mono whitespace-pre-wrap leading-relaxed">
-                                    {table.sourceExpression}
-                                </pre>
+                    <div className="border-t border-gray-100 bg-gray-50/50 p-6 animate-fade-in">
+                        
+                        {/* 1. POWER QUERY SOURCE */}
+                        {table.sourceExpression && (
+                            <div className="mb-8">
+                                <h4 className="text-[11px] font-black uppercase text-gray-400 mb-3 flex items-center tracking-widest">
+                                    <Code size={16} className="mr-2 text-brand-primary"/> Fonte de Dados (M)
+                                </h4>
+                                <div className="bg-[#1E1E1E] text-gray-300 p-5 rounded-xl text-xs font-mono shadow-2xl border border-gray-800">
+                                    <pre className="whitespace-pre-wrap leading-relaxed">{table.sourceExpression}</pre>
+                                </div>
                             </div>
-                        </div>
-                    )}
+                        )}
 
-                    <div className="mb-6">
-                        <h4 className="text-sm font-bold uppercase text-gray-500 mb-2 flex items-center justify-between">
-                            <span>Colunas</span>
-                            <span className="text-xs font-normal bg-gray-200 px-2 py-0.5 rounded-full">{table.columns.length}</span>
-                        </h4>
-                        {table.columns.length > 0 ? (
-                            <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+                        {/* 2. TABELA DE COLUNAS */}
+                        <div>
+                            <h4 className="text-[11px] font-black uppercase text-gray-400 mb-3 flex items-center tracking-widest">
+                                <Layers size={16} className="mr-2 text-brand-primary"/> Estrutura de Colunas
+                            </h4>
+                            <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden shadow-sm">
                                 <table className="w-full text-sm text-left">
-                                    <thead className="bg-gray-100 text-gray-600 font-semibold border-b border-gray-200">
+                                    <thead className="bg-gray-50 text-gray-400 font-black text-[10px] uppercase border-b border-gray-200">
                                         <tr>
-                                            <th className="p-3">Nome / Descrição</th>
-                                            <th className="p-3">Tipo de Dado</th>
-                                            <th className="p-3 text-center">Oculta?</th>
-                                            <th className="p-3 text-center">Em Uso?</th>
+                                            <th className="p-4">Campo / Documentação</th>
+                                            <th className="p-4">Tipo</th>
+                                            <th className="p-4 text-center">Status</th>
+                                            <th className="p-4 text-right">Ação</th>
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-gray-100">
                                         {table.columns.map(col => {
-                                            const isCalculated = table.type === 'Calculated' || col.expression; // Basic heuristic
+                                            const isSelected = expandedCol === `${table.name}-${col.name}`;
                                             return (
-                                            <tr key={col.name} className="hover:bg-gray-50">
-                                                <td className="p-3">
-                                                    <div className="flex items-center">
-                                                        {isCalculated && <Sigma size={14} className="text-orange-500 mr-1.5" />}
-                                                        <span className="font-medium text-brand-dark">{col.name}</span>
-                                                    </div>
-                                                    
-                                                    {editingColId === `${table.name}-${col.name}` ? (
-                                                        <div className="mt-2 space-y-2">
-                                                            <input 
-                                                                className="w-full p-1 text-xs border rounded"
-                                                                value={tempColDesc}
-                                                                onChange={(e) => setTempColDesc(e.target.value)}
-                                                            />
-                                                            <div className="flex gap-1">
-                                                                <button onClick={() => handleSaveColumn(table, col.name)} className="text-[10px] bg-green-600 text-white px-2 py-0.5 rounded">OK</button>
-                                                                <button onClick={() => setEditingColId(null)} className="text-[10px] bg-gray-400 text-white px-2 py-0.5 rounded">X</button>
+                                            <React.Fragment key={col.name}>
+                                                <tr className={`transition-colors ${isSelected ? 'bg-blue-50/50' : 'hover:bg-gray-50'}`}>
+                                                    <td className="p-4">
+                                                        <div className="flex items-center gap-2">
+                                                            {col.expression && <Sigma size={14} className="text-orange-500" />}
+                                                            <span className="font-bold text-gray-700">{col.name}</span>
+                                                        </div>
+                                                        {editingColId === `${table.name}-${col.name}` ? (
+                                                            <div className="mt-2 flex gap-2">
+                                                                <input className="flex-1 p-1.5 text-xs border-2 border-brand-primary rounded-lg outline-none" value={tempColDesc} onChange={(e) => setTempColDesc(e.target.value)} />
+                                                                <button onClick={() => handleSaveColumn(table, col.name)} className="bg-emerald-600 text-white px-3 py-1 rounded-lg text-[10px] font-bold">SALVAR</button>
+                                                                <button onClick={() => setEditingColId(null)} className="bg-gray-400 text-white px-3 py-1 rounded-lg text-[10px] font-bold">X</button>
                                                             </div>
-                                                        </div>
-                                                    ) : (
-                                                        <div 
-                                                            className="text-xs text-blue-600 bg-blue-50 border border-transparent hover:border-blue-200 cursor-pointer rounded px-2 py-1 mt-1.5 inline-block"
-                                                            onClick={() => {
-                                                                setEditingColId(`${table.name}-${col.name}`);
-                                                                setTempColDesc(col.description || '');
-                                                            }}
+                                                        ) : (
+                                                            <p onClick={() => { setEditingColId(`${table.name}-${col.name}`); setTempColDesc(col.description || ''); }} className="text-[11px] text-blue-500 cursor-pointer mt-1 hover:underline">
+                                                                {col.description || "+ Adicionar descrição de negócio..."}
+                                                            </p>
+                                                        )}
+                                                    </td>
+                                                    <td className="p-4 font-mono text-[11px] text-gray-400">{col.dataType}</td>
+                                                    <td className="p-4 text-center">
+                                                        {col.isUsedInReport ? 
+                                                            <span className="bg-emerald-100 text-emerald-700 text-[9px] px-2 py-0.5 rounded-full font-bold uppercase">Em Uso</span> : 
+                                                            <span className="bg-rose-50 text-rose-600 text-[9px] px-2 py-0.5 rounded-full font-bold uppercase">Não Usada</span>
+                                                        }
+                                                    </td>
+                                                    <td className="p-4 text-right">
+                                                        <button 
+                                                            onClick={() => setExpandedCol(isSelected ? null : `${table.name}-${col.name}`)}
+                                                            className={`p-2 rounded-lg transition-colors ${isSelected ? 'bg-brand-primary text-white shadow-md' : 'bg-gray-100 text-gray-400 hover:bg-gray-200'}`}
                                                         >
-                                                            {col.description || "+ Adicionar descrição"}
-                                                        </div>
-                                                    )}
-                                                </td>
-                                                <td className="p-3 text-gray-500 font-mono text-xs align-top pt-3.5">{col.dataType}</td>
-                                                <td className="p-3 text-center align-top pt-3.5">
-                                                    {col.isHidden && <EyeOff size={16} className="mx-auto text-gray-400"/>}
-                                                </td>
-                                                <td className="p-3 text-center align-top pt-3.5">
-                                                    {col.isUsedInReport ? (
-                                                        <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800">
-                                                            Sim
-                                                        </span>
-                                                    ) : (
-                                                        <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-red-800">
-                                                            Não
-                                                        </span>
-                                                    )}
-                                                </td>
-                                            </tr>
+                                                            <GitBranch size={16} />
+                                                        </button>
+                                                    </td>
+                                                </tr>
+                                                
+                                                {/* 3. DETALHES DE IMPACTO DA COLUNA (EXPANSÃO) */}
+                                                {isSelected && (
+                                                    <tr>
+                                                        <td colSpan={4} className="bg-gray-50 p-6 border-b border-gray-200 animate-fade-in">
+                                                            <div className="max-w-4xl mx-auto space-y-6">
+                                                                {col.expression && (
+                                                                    <div>
+                                                                        <h5 className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Cálculo da Coluna (DAX)</h5>
+                                                                        <DAXCodeBlock code={col.expression} />
+                                                                    </div>
+                                                                )}
+                                                                <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+                                                                    <ImpactAnalyzer item={col} />
+                                                                </div>
+                                                            </div>
+                                                        </td>
+                                                    </tr>
+                                                )}
+                                            </React.Fragment>
                                         )})}
                                     </tbody>
                                 </table>
                             </div>
-                        ) : (
-                            <div className="text-sm text-gray-400 italic bg-white p-4 rounded border border-gray-100">Sem colunas físicas (Tabela de Medidas ou Calc Group).</div>
-                        )}
-                    </div>
+                        </div>
                     </div>
                 )}
                 </div>
             ))
-        ) : (
-            <div className="text-center py-16 bg-white rounded-xl border border-dashed border-gray-300">
-                <Filter size={48} className="mx-auto text-gray-200 mb-4"/>
-                <p className="text-gray-500 font-medium">Nenhuma tabela encontrada com este filtro.</p>
-            </div>
-        )}
+        }
       </div>
     </div>
   );
