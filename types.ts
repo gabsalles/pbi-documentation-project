@@ -10,6 +10,7 @@ export interface PBIMeasure {
   parentTable: string;
   isCalculationItem?: boolean;
   sourceFilePath?: string; // Caminho completo do arquivo .tmdl no Windows/Mac
+  dependents?: string[];  // <-- ADICIONA só esta linha nova.
 }
 
 export interface PBIColumn {
@@ -22,6 +23,8 @@ export interface PBIColumn {
   summarizeBy?: string;
   expression?: string; // For Calculated Columns
   SourceFilePath?: string; // Adicione isto
+  dependencies?: string[]; 
+  dependents?: string[];
 }
 
 export interface PBIParameter {

@@ -49,6 +49,105 @@ const extractLiteralValue = (obj: any): string | null => {
     return null;
 };
 
+/**
+ * Analisa o DAX de todas as medidas e colunas para mapear as dependências cruzadas.
+ * Deve ser chamada no final do parser, antes de retornar o modelo para a interface.
+ */
+export const buildLineageGraph = (model: any) => { // Use o tipo PBIModel se tiver importado
+    // 1. Inicializar as listas (para evitar erros de undefined)
+    model.tables.forEach((t: any) => {
+        t.measures.forEach((m: any) => { m.dependencies = []; m.dependents = []; });
+        t.columns.forEach((c: any) => { c.dependencies = []; c.dependents = []; });
+    });
+
+    // 2. Criar dicionários rápidos de busca (Hash Maps)
+    const measureMap = new Map();
+    const columnMap = new Map();
+
+    model.tables.forEach((t: any) => {
+        t.measures.forEach((m: any) => measureMap.set(m.name.toLowerCase(), m));
+        t.columns.forEach((c: any) => {
+            // Guarda as duas formas que o DAX pode escrever a coluna
+            columnMap.set(`'${t.name}'[${c.name}]`.toLowerCase(), c);
+            columnMap.set(`${t.name}[${c.name}]`.toLowerCase(), c);
+        });
+    });
+
+    // 3. O Detetive de DAX (Regex Scanner)
+    const scanExpression = (itemName: string, expression: string, currentItem: any, currentTable: string) => {
+        if (!expression) return;
+        
+        // A. Limpar o DAX para evitar falsos positivos
+        let cleanedDax = expression
+            .replace(/\/\*[\s\S]*?\*\//g, '') // Remove comentários em bloco /* ... */
+            .replace(/\/\/.*|\-\-.*/g, '')     // Remove comentários de linha // ou --
+            .replace(/"(?:[^"\\]|\\.)*"/g, ''); // Remove textos literais "..."
+
+        // B. Encontrar Colunas Explícitas: 'Tabela'[Coluna] ou Tabela[Coluna]
+        const fullColRegex = /'?([a-zA-Z0-9_\s]+)'?\[([^\]]+)\]/g;
+        let match;
+        while ((match = fullColRegex.exec(cleanedDax)) !== null) {
+            const tableName = match[1];
+            const colName = match[2];
+            const lookupKey1 = `'${tableName}'[${colName}]`.toLowerCase();
+            const lookupKey2 = `${tableName}[${colName}]`.toLowerCase();
+            
+            const targetCol = columnMap.get(lookupKey1) || columnMap.get(lookupKey2);
+            if (targetCol) {
+                const refName = `${tableName}[${colName}]`;
+                const myName = `${currentTable}[${itemName}]`;
+                
+                // Eu dependo da Coluna
+                if (!currentItem.dependencies.includes(refName)) currentItem.dependencies.push(refName);
+                // A Coluna sabe que eu existo (Dependente)
+                if (!targetCol.dependents.includes(myName)) targetCol.dependents.push(myName);
+            }
+        }
+
+        // C. Removemos as colunas encontradas para procurar as medidas
+        cleanedDax = cleanedDax.replace(fullColRegex, '');
+
+        // D. Encontrar Medidas Soltas: [Nome da Medida]
+        const standaloneRegex = /\[([^\]]+)\]/g;
+        while ((match = standaloneRegex.exec(cleanedDax)) !== null) {
+            const name = match[1].toLowerCase();
+            
+            // É uma medida?
+            const targetMeasure = measureMap.get(name);
+            if (targetMeasure) {
+                const refName = `[${targetMeasure.name}]`;
+                const myName = `${currentTable}[${itemName}]`;
+
+                if (!currentItem.dependencies.includes(refName)) currentItem.dependencies.push(refName);
+                if (!targetMeasure.dependents.includes(myName)) targetMeasure.dependents.push(myName);
+            } else {
+                // Se não é medida, pode ser uma coluna referenciada sem o nome da tabela (má prática de DAX, mas acontece)
+                const implicitColKey1 = `'${currentTable}'[${match[1]}]`.toLowerCase();
+                const implicitColKey2 = `${currentTable}[${match[1]}]`.toLowerCase();
+                const targetCol = columnMap.get(implicitColKey1) || columnMap.get(implicitColKey2);
+                
+                if (targetCol) {
+                    const refName = `${currentTable}[${targetCol.name}]`;
+                    const myName = `${currentTable}[${itemName}]`;
+                    if (!currentItem.dependencies.includes(refName)) currentItem.dependencies.push(refName);
+                    if (!targetCol.dependents.includes(myName)) targetCol.dependents.push(myName);
+                }
+            }
+        }
+    };
+
+    // 4. Rodar o Scanner em todo o modelo
+    model.tables.forEach((t: any) => {
+        t.measures.forEach((m: any) => scanExpression(m.name, m.expression, m, t.name));
+        t.columns.forEach((c: any) => {
+            if (c.expression) scanExpression(c.name, c.expression, c, t.name); // Colunas calculadas
+        });
+    });
+
+    return model;
+};
+
+
 // --- MAIN EXPORT ---
 
 export const parsePBIPData = async (files: FileList): Promise<PBIModel> => {
@@ -241,10 +340,11 @@ export const parsePBIPData = async (files: FileList): Promise<PBIModel> => {
       }
   }
 
-  analyzeMeasureDependencies(model);
+//   analyzeMeasureDependencies(model);
   analyzeReportUsage(model);
 
-  return model;
+//   return model;
+  return buildLineageGraph(model);
 };
 
 // --- JSON PARSER (MODEL.BIM) ---
@@ -1046,22 +1146,22 @@ const parseLegacyReportJson = (content: string): PBIPage[] => {
   }
 };
 
-const analyzeMeasureDependencies = (model: PBIModel) => {
-  const measureMap = new Set<string>();
-  model.tables.forEach(t => t.measures.forEach(m => measureMap.add(m.name)));
+// const analyzeMeasureDependencies = (model: PBIModel) => {
+//   const measureMap = new Set<string>();
+//   model.tables.forEach(t => t.measures.forEach(m => measureMap.add(m.name)));
 
-  model.tables.forEach(t => {
-    t.measures.forEach(m => {
-        const bracketMatches = m.expression.matchAll(/\[([^\]]+)\]/g);
-        for (const match of bracketMatches) {
-            const ref = match[1].trim();
-            if (measureMap.has(ref) && ref !== m.name) {
-                if (!m.dependencies.includes(ref)) m.dependencies.push(ref);
-            }
-        }
-    });
-  });
-};
+//   model.tables.forEach(t => {
+//     t.measures.forEach(m => {
+//         const bracketMatches = m.expression.matchAll(/\[([^\]]+)\]/g);
+//         for (const match of bracketMatches) {
+//             const ref = match[1].trim();
+//             if (measureMap.has(ref) && ref !== m.name) {
+//                 if (!m.dependencies.includes(ref)) m.dependencies.push(ref);
+//             }
+//         }
+//     });
+//   });
+// };
 
 const analyzeReportUsage = (model: PBIModel) => {
     const usedCols = new Set<string>();
