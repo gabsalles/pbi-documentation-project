@@ -3,15 +3,17 @@ import ImpactAnalyzer from './ImpactAnalyzer';
 import { PBIModel, PBIMeasure } from '../types';
 import { 
   Search, Calculator, GitBranch, ArrowRight, Filter, Hash, 
-  Type, Code, Settings, FileType, Save, X, FileText // <-- ADICIONE O FILETEXT AQUI!
+  Type, Code, Settings, FileType, Save, X, FileText,
+  CheckCircle, AlertTriangle 
 } from 'lucide-react';
+
 interface MeasuresViewProps {
   model: PBIModel;
 }
 
 const MeasuresView: React.FC<MeasuresViewProps> = ({ model }) => {
   const [searchTerm, setSearchTerm] = useState('');
-  const [usageFilter, setUsageFilter] = useState<'all' | 'used' | 'unused'>('all');
+  const [usageFilter, setUsageFilter] = useState<'all' | 'used' | 'unused' | 'safe' | 'atRisk'>('all');
   const [editingId, setEditingId] = useState<string | null>(null);
   const [tempDescription, setTempDescription] = useState('');
 
@@ -22,9 +24,14 @@ const MeasuresView: React.FC<MeasuresViewProps> = ({ model }) => {
     const matchesSearch = (m.name || '').toLowerCase().includes(searchTerm.toLowerCase()) || 
                           (m.expression || '').toLowerCase().includes(searchTerm.toLowerCase());
     
-    const matchesFilter = usageFilter === 'all' 
-        ? true 
-        : usageFilter === 'used' ? m.isUsedInReport : !m.isUsedInReport;
+    const isSafe = (!m.dependents || m.dependents.length === 0) && !m.isUsedInReport;
+    const isAtRisk = (m.dependents && m.dependents.length > 0) || m.isUsedInReport;
+
+    let matchesFilter = true;
+    if (usageFilter === 'used') matchesFilter = m.isUsedInReport;
+    if (usageFilter === 'unused') matchesFilter = !m.isUsedInReport;
+    if (usageFilter === 'safe') matchesFilter = isSafe;
+    if (usageFilter === 'atRisk') matchesFilter = isAtRisk;
 
     return matchesSearch && matchesFilter;
   });
@@ -49,50 +56,93 @@ const MeasuresView: React.FC<MeasuresViewProps> = ({ model }) => {
 
   return (
     <div className="p-6 space-y-6 bg-gray-50 min-h-screen">
-      {/* HEADER E FILTROS */}
-      <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-4 bg-white p-4 rounded-xl border border-gray-200 shadow-sm">
-        <div>
-          <h2 className="text-2xl font-bold text-brand-dark">Catálogo de Medidas (DAX)</h2>
-          <p className="text-sm text-gray-500">Total de {filteredMeasures.length} medidas encontradas</p>
-        </div>
-        
-        <div className="flex flex-col md:flex-row gap-4">
-            <div className="flex items-center space-x-1 bg-gray-100 p-1 rounded-lg border border-gray-200">
-                <button 
-                    onClick={() => setUsageFilter('all')}
-                    className={`px-4 py-1.5 text-xs font-bold rounded-md transition-all ${usageFilter === 'all' ? 'bg-white text-brand-dark shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
-                >
-                    TODAS
-                </button>
-                <button 
-                    onClick={() => setUsageFilter('used')}
-                    className={`px-4 py-1.5 text-xs font-bold rounded-md transition-all ${usageFilter === 'used' ? 'bg-green-600 text-white shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
-                >
-                    EM USO
-                </button>
-                <button 
-                    onClick={() => setUsageFilter('unused')}
-                    className={`px-4 py-1.5 text-xs font-bold rounded-md transition-all ${usageFilter === 'unused' ? 'bg-amber-500 text-white shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
-                >
-                    NÃO UTILIZADAS
-                </button>
+      
+      {/* NOVO HEADER COM DESIGN REFEITO */}
+      <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm">
+        <div className="flex flex-col gap-6">
+          <div>
+            <h2 className="text-2xl font-bold text-gray-800 tracking-tight">Catálogo de Medidas (DAX)</h2>
+            <p className="text-sm text-gray-500 mt-1">
+              Analise a linhagem e o impacto das suas regras de negócio.
+            </p>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-8">
+            {/* GRUPO 1: VISÃO GERAL (Segmented Control) */}
+            <div className="flex flex-col gap-2">
+              <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Visão Geral</span>
+              <div className="flex p-1 bg-gray-100 rounded-xl border border-gray-200 shadow-inner">
+                {[
+                  { id: 'all', label: 'Todas' },
+                  { id: 'used', label: 'Em Uso' },
+                  { id: 'unused', label: 'Inativas' },
+                ].map((opt) => (
+                  <button
+                    key={opt.id}
+                    onClick={() => setUsageFilter(opt.id as any)}
+                    className={`px-4 py-1.5 text-xs font-bold rounded-lg transition-all duration-200 ${
+                      usageFilter === opt.id 
+                      ? 'bg-white text-gray-800 shadow-sm ring-1 ring-black/5' 
+                      : 'text-gray-500 hover:text-gray-700 hover:bg-gray-200/50'
+                    }`}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
             </div>
 
-            <div className="relative">
-                <Search className="absolute left-3 top-2.5 text-gray-400" size={18} />
-                <input 
-                    type="text" 
-                    placeholder="Buscar medida ou código DAX..." 
-                    className="w-full md:w-80 pl-10 pr-4 py-2 rounded-lg border border-gray-200 focus:ring-2 focus:ring-brand-primary outline-none transition-all"
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                />
+            {/* DIVISOR VERTICAL */}
+            <div className="hidden xl:block w-px h-10 bg-gray-200 mt-4"></div>
+
+            {/* GRUPO 2: MODOS DE AUDITORIA (Action Pills) */}
+            <div className="flex flex-col gap-2">
+              <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Modos de Auditoria</span>
+              <div className="flex items-center gap-3">
+                <button 
+                  onClick={() => setUsageFilter('safe')}
+                  className={`flex items-center gap-2 px-4 py-2 text-xs font-black rounded-xl border-2 transition-all duration-300 ${
+                    usageFilter === 'safe' 
+                    ? 'bg-emerald-600 border-emerald-600 text-white shadow-lg shadow-emerald-100 scale-105' 
+                    : 'bg-white border-emerald-100 text-emerald-600 hover:border-emerald-500 hover:bg-emerald-50'
+                  }`}
+                >
+                  <CheckCircle size={14} /> LIMPEZA SEGURA
+                </button>
+
+                <button 
+                  onClick={() => setUsageFilter('atRisk')}
+                  className={`flex items-center gap-2 px-4 py-2 text-xs font-black rounded-xl border-2 transition-all duration-300 ${
+                    usageFilter === 'atRisk' 
+                    ? 'bg-rose-600 border-rose-600 text-white shadow-lg shadow-rose-100 scale-105' 
+                    : 'bg-white border-rose-100 text-rose-600 hover:border-rose-500 hover:bg-rose-50'
+                  }`}
+                >
+                  <AlertTriangle size={14} /> ALTO IMPACTO
+                </button>
+              </div>
             </div>
+
+            {/* GRUPO 3: BUSCA (Alinhada à direita) */}
+            <div className="flex-1 min-w-[300px] flex flex-col gap-2 xl:ml-auto">
+              <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Pesquisar Medida</span>
+              <div className="relative group">
+                <Search className="absolute left-3 top-2.5 text-gray-400 group-focus-within:text-brand-primary transition-colors" size={18} />
+                <input 
+                  type="text" 
+                  placeholder="Nome ou código DAX..." 
+                  className="w-full pl-10 pr-4 py-2 rounded-xl border-2 border-gray-100 bg-gray-50 focus:bg-white focus:border-brand-primary focus:ring-4 focus:ring-brand-primary/10 outline-none transition-all"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                />
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 
       {/* LISTA DE CARDS */}
-      <div className="space-y-6">
+      <div className="space-y-6 pb-12">
         {filteredMeasures.map((measure, idx) => {
             const uniqueId = `${measure.parentTable}-${measure.name}-${idx}`;
             
@@ -118,9 +168,14 @@ const MeasuresView: React.FC<MeasuresViewProps> = ({ model }) => {
                     </div>
                     <div className="flex flex-col items-end gap-2">
                         {measure.isUsedInReport ? (
-                            <span className="bg-green-100 text-green-700 text-[10px] px-3 py-1 rounded-full font-black border border-green-200 uppercase">Em Uso no Relatório</span>
+                            <span className="bg-emerald-100 text-emerald-700 text-[10px] px-3 py-1 rounded-full font-black border border-emerald-200 uppercase tracking-tight">Em Uso no Relatório</span>
                         ) : (
-                            <span className="bg-gray-100 text-gray-400 text-[10px] px-3 py-1 rounded-full font-black border border-gray-200 uppercase">Não detectada em visuais</span>
+                            <span className="bg-gray-100 text-gray-400 text-[10px] px-3 py-1 rounded-full font-black border border-gray-200 uppercase tracking-tight">Não detectada em visuais</span>
+                        )}
+                        {measure.dependents && measure.dependents.length > 0 && (
+                            <span className="bg-rose-50 text-rose-600 text-[9px] font-bold px-2 py-0.5 rounded border border-rose-100 italic">
+                                Alicerce para {measure.dependents.length} medidas
+                            </span>
                         )}
                     </div>
                 </div>
@@ -168,23 +223,19 @@ const MeasuresView: React.FC<MeasuresViewProps> = ({ model }) => {
                             <Code size={16} className="mr-2 text-brand-primary"/> Lógica da Medida (DAX)
                         </h4>
                         <div className="bg-[#1E1E1E] rounded-xl p-5 overflow-x-auto border border-gray-800 shadow-2xl relative group">
-                            <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity">
-                                <span className="text-[10px] text-gray-500 font-mono">DAX Language</span>
-                            </div>
                             <code className="text-[#D4D4D4] font-mono text-sm whitespace-pre-wrap leading-relaxed">
                                 {measure.expression}
                             </code>
                         </div>
                     </div>
 
-                    {/* --- 4. ANÁLISE DE IMPACTO (O NOVO COMPONENTE) --- */}
+                    {/* --- 4. ANÁLISE DE IMPACTO (CRUZAMENTO COMPLETO) --- */}
                     <div className="mb-8 p-1 bg-gray-50 rounded-2xl border border-gray-100">
                          <ImpactAnalyzer item={measure} />
                     </div>
 
                     {/* 5. METADADOS TÉCNICOS */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        {/* Coluna Esquerda: Formatação */}
                         <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm hover:border-blue-200 transition-colors">
                             <h4 className="text-[10px] font-black uppercase text-blue-600 mb-4 flex items-center tracking-widest">
                                 <Type size={14} className="mr-2"/> Formatação e Tipagem
@@ -200,48 +251,20 @@ const MeasuresView: React.FC<MeasuresViewProps> = ({ model }) => {
                                         <span className="text-xs text-gray-400 italic">Padrão do Power BI</span>
                                     )}
                                 </div>
-                                {measure.annotations && Object.keys(measure.annotations).length > 0 && (
-                                    <div className="pt-4 border-t border-gray-50">
-                                        <span className="text-[10px] text-gray-400 font-bold uppercase block mb-3">Anotações do Modelo</span>
-                                        <div className="grid grid-cols-1 gap-2">
-                                            {Object.entries(measure.annotations).map(([k, v]) => (
-                                                <div key={k} className="flex flex-col p-2 bg-gray-50 rounded-lg border border-gray-100">
-                                                    <span className="text-[9px] text-gray-400 font-black uppercase">{k}</span>
-                                                    <span className="text-[11px] font-mono text-gray-600 truncate">{v}</span>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    </div>
-                                )}
                             </div>
                         </div>
 
-                        {/* Coluna Direita: Informações de Arquivo */}
                         <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm hover:border-orange-200 transition-colors">
                             <h4 className="text-[10px] font-black uppercase text-orange-600 mb-4 flex items-center tracking-widest">
                                 <GitBranch size={14} className="mr-2"/> Localização do Objeto
                             </h4>
-                            <div className="space-y-4">
-                                <div>
-                                    <span className="text-[10px] text-gray-400 font-bold uppercase block mb-1">Origem do Metadado</span>
-                                    <div className="flex items-center gap-2 p-3 bg-orange-50/50 rounded-xl border border-orange-100">
-                                        <div className="p-1.5 bg-orange-100 text-orange-600 rounded-md">
-                                            <FileType size={14} />
-                                        </div>
-                                        <span className="text-[11px] font-mono text-orange-800 truncate" title={measure.sourceFilePath}>
-                                            {measure.sourceFilePath?.split('/').pop() || 'Arquivo não mapeado'}
-                                        </span>
-                                    </div>
+                            <div>
+                                <span className="text-[10px] text-gray-400 font-bold uppercase block mb-1">Ficheiro TMDL</span>
+                                <div className="flex items-center gap-2 p-3 bg-orange-50/50 rounded-xl border border-orange-100">
+                                    <span className="text-[11px] font-mono text-orange-800 truncate">
+                                        {measure.sourceFilePath?.split('/').pop() || 'Desconhecido'}
+                                    </span>
                                 </div>
-                                {measure.lineageTag && (
-                                    <div className="pt-4 border-t border-gray-50">
-                                        <span className="text-[10px] text-gray-400 font-bold uppercase block mb-1">Lineage Tag (GUID)</span>
-                                        <div className="flex items-center gap-2 px-3 py-2 bg-gray-100 rounded-lg">
-                                            <Hash size={12} className="text-gray-400" />
-                                            <code className="text-[10px] font-mono text-gray-500">{measure.lineageTag}</code>
-                                        </div>
-                                    </div>
-                                )}
                             </div>
                         </div>
                     </div>
