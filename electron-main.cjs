@@ -16,6 +16,7 @@ function createWindow () {
 
   if (process.env.NODE_ENV === 'development') {
     win.loadURL('http://localhost:3000');
+    win.webContents.openDevTools(); // <--- ADICIONE ESTA LINHA!
   } else {
     win.loadFile(path.join(__dirname, 'dist/index.html'));
   }
@@ -161,6 +162,87 @@ ipcMain.handle('bulk-update-folders', async (event, { updates }) => {
       }
     } catch (e) {
       errors.push(`Erro ${update.itemName}: ${e.message}`);
+    }
+  }
+  return { success: true, successCount, errors };
+});
+
+// --- MOTOR DE TRANSFERÊNCIA DE MEDIDAS ENTRE TABELAS ---
+ipcMain.handle('move-measures', async (event, { moves }) => {
+  let successCount = 0;
+  let errors = [];
+
+  for (const move of moves) {
+    try {
+      // 1. LER O FICHEIRO DE ORIGEM
+      let sourceContent = fs.readFileSync(move.sourcePath, 'utf-8');
+      let sourceLines = sourceContent.split(/\r?\n/);
+      
+      const measureStartIndex = sourceLines.findIndex(line => {
+        const t = line.trim();
+        return t.startsWith(`measure '${move.itemName}'`) || 
+               t.startsWith(`measure "${move.itemName}"`) || 
+               t.startsWith(`measure ${move.itemName}`);
+      });
+
+      if (measureStartIndex === -1) {
+        errors.push(`Não encontrei: ${move.itemName} na origem.`);
+        continue;
+      }
+
+      // Detetar a indentação original da medida (normalmente 1 Tab)
+      const baseIndentMatch = sourceLines[measureStartIndex].match(/^(\s*)/);
+      const baseIndent = baseIndentMatch ? baseIndentMatch[1] : '';
+      
+      // Encontrar onde termina o bloco da medida (onde a indentação volta a ser igual ou menor)
+      let endIndex = measureStartIndex + 1;
+      while (endIndex < sourceLines.length) {
+        const line = sourceLines[endIndex];
+        if (line.trim() === '') { endIndex++; continue; } // Ignora linhas em branco no meio
+        
+        const lineIndent = line.match(/^(\s*)/)[1];
+        // Se a indentação for menor ou igual e não for um comentário ///, o bloco acabou
+        if (lineIndent.length <= baseIndent.length && !line.trim().startsWith('///')) {
+           break;
+        }
+        endIndex++;
+      }
+
+      // Subir para incluir os comentários /// antes da medida
+      let actualStartIndex = measureStartIndex;
+      while (actualStartIndex > 0 && sourceLines[actualStartIndex - 1].trim().startsWith('///')) {
+         actualStartIndex--;
+      }
+
+      // RECORTAR o bloco inteiro da matriz original
+      const measureBlock = sourceLines.splice(actualStartIndex, endIndex - actualStartIndex);
+      
+      // Ajustar a pasta (displayFolder) no bloco recortado
+      if (move.newFolder) {
+         const folderLineIndex = measureBlock.findIndex(l => l.trim().startsWith('displayFolder'));
+         const propertyIndent = baseIndent + '\t'; // Indentação de propriedade
+         
+         if (folderLineIndex !== -1) {
+             measureBlock[folderLineIndex] = `${propertyIndent}displayFolder: ${move.newFolder}`; // Substitui
+         } else {
+             // Insere logo abaixo da linha "measure 'Nome' = ..."
+             const insertPos = (measureStartIndex - actualStartIndex) + 1;
+             measureBlock.splice(insertPos, 0, `${propertyIndent}displayFolder: ${move.newFolder}`);
+         }
+      }
+
+      // GRAVAR AS ALTERAÇÕES NO FICHEIRO DE ORIGEM (Sem a medida)
+      fs.writeFileSync(move.sourcePath, sourceLines.join('\n'), 'utf-8');
+
+      // 2. LER E COLAR NO FICHEIRO DE DESTINO
+      let targetContent = fs.readFileSync(move.targetPath, 'utf-8');
+      // Colar o bloco no final do ficheiro da nova tabela
+      targetContent += '\n\n' + measureBlock.join('\n');
+      fs.writeFileSync(move.targetPath, targetContent, 'utf-8');
+
+      successCount++;
+    } catch (e) {
+      errors.push(`Erro em ${move.itemName}: ${e.message}`);
     }
   }
   return { success: true, successCount, errors };
